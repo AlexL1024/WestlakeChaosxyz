@@ -310,6 +310,34 @@
   #tuiPad .tb.big { font-size:21px; letter-spacing:0; }
   #tuiPad .tb small { display:block; font-size:9px; letter-spacing:1.4px; opacity:.85; margin-top:2px; }
   #tuiPad .tb.on { background:rgba(255,210,63,.34); border-color:#ffd23f; color:#fff; transform:scale(.94); }
+  /* the one-time lesson when you take your seat in assembly */
+  #tuiTitle { position:absolute; inset:0; z-index:2; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; text-align:center; padding:0 7vw 16vh;
+    /* dark everywhere except a clear window over the buttons */
+    background:radial-gradient(circle at calc(100% - 90px) calc(100% - 74px),
+      rgba(4,10,7,0) 0, rgba(4,10,7,0) 105px, rgba(4,10,7,.90) 210px);
+    opacity:0; transition:opacity .45s ease; }
+  #tuiTitle.show { opacity:1; }
+  #tuiTitle b { display:block; font-size:clamp(24px,5.6vw,46px); font-weight:900; letter-spacing:4px;
+    color:#ffd23f; line-height:1.12;
+    text-shadow:0 0 6px #000, 0 0 24px #000, 0 4px 26px rgba(0,0,0,1); }
+  #tuiTitle span { display:block; margin-top:13px; font-size:clamp(12px,2.3vw,17px); font-weight:800;
+    letter-spacing:1.5px; color:#eaf7ef; line-height:1.65;
+    text-shadow:0 0 5px #000, 0 2px 14px #000; }
+  #tuiTitle i { position:absolute; right:calc(30px + var(--tb,76px) * 1.35);
+    bottom:calc(30px + var(--tb,76px) * 0.55);
+    font-style:normal; font-size:clamp(40px,8vw,68px); font-weight:900; color:#ffd23f;
+    text-shadow:0 0 6px #000, 0 0 24px #000; animation:ttPoke 1.05s ease-in-out infinite; }
+  @keyframes ttPoke { 0%,100%{ transform:translate(-8px,-8px); opacity:.6 }
+                      50%{ transform:translate(6px,6px); opacity:1 } }
+  #tuiPad { z-index:3; }
+  #tuiPad .tb { position:relative; }
+  #tuiPad .tb .lab { transition:opacity .8s ease; }
+  #tuiPad.hushed .tb.secret .lab { opacity:0; }
+  #tuiPad .tb.secret::after { content:'?'; position:absolute; font-size:26px; font-weight:900;
+    color:#ffd23f; opacity:0; transition:opacity .8s ease; }
+  #tuiPad.hushed .tb.secret::after { opacity:.55; }
+
   #tuiHint { position:absolute; left:16px; bottom:22px; width:40vw; font-size:10px; font-weight:800;
     letter-spacing:1.4px; line-height:1.5; color:rgba(255,255,255,.38); text-shadow:0 2px 8px #000; }
   #tuiRotate { position:fixed; inset:0; z-index:55; display:none; align-items:center;
@@ -451,6 +479,9 @@
 <div id="tui" class="hidden">
   <div id="tuiStick" class="hidden"><i></i></div>
   <div id="tuiHint" class="hidden">DRAG LEFT TO MOVE &middot; RIGHT TO LOOK</div>
+  <div id="tuiTitle"><b>REMEMBER THE BUTTONS</b>
+    <span>These two are yours for the whole assembly.<br>The letters disappear in 8 seconds.</span>
+    <i>&#10549;</i></div>
   <div id="tuiPad"></div>
 </div>
 <div id="tuiRotate"><div><b>TURN YOUR PHONE</b><span>westlakeboys.xyz plays sideways.<br>Rotate to landscape to start the day.</span></div></div>
@@ -3522,6 +3553,7 @@ function updateHall(dt){
       banner('ROW '+(nearSeat.row+1)+'.', '+'+Hall.seatAura(nearSeat.row)+' aura for the seat', 2400);
       $('hallSit').style.opacity=0;
       if (!S.hintShown){ S.hintShown=true; Hall.showKeyHint(false); }
+      tuiSitLesson();
     }
   } else $('hallSit').style.opacity = 0;
 
@@ -5031,7 +5063,8 @@ const LUN = {
   SERVE_T: 1.10,      // seconds per window per student
   KIOSK  : { x:0, y:0.42+1.07+0.40, z:1.10 },        // the self-order screen on the middle counter
   COUNTER: 1.14,      // front face of the counter — nobody gets past this
-  REACH  : 0.62       // you have to be right up against it
+  REACH  : 0.62,      // you have to be right up against it
+  REACH_TOUCH: 1.35   // a phone gets more room, because you tap the box, not the screen
 };
 const LUNCH_EXITS = (function(){        // building exits, all about the same run from the counter
   const out=[];
@@ -5446,6 +5479,7 @@ const Lunch = (function(){
   const NPC_N = 100;
   let group=null, built=false, teacherMesh=null;
   let kioskGroup=null, kioskCanvas=null, kioskTex=null, kioskHalo=null, kioskBeacon=null;
+  let kioskTap=null, kioskTapFill=null, kioskTapEdge=null;
   const staff=[];
   const A = [];                       // every student in the courtyard, you included
   let P = null;                       // you
@@ -5513,6 +5547,20 @@ const Lunch = (function(){
     kioskBeacon.add(halo);
     kioskBeacon.position.set(LUN.KIOSK.x, LUN.KIOSK.y + 1.62, LUN.KIOSK.z);
     group.add(kioskBeacon);
+    // a big glass box around the kiosk: on a phone you aim at this, not at the screen
+    kioskTap = new THREE.Group();
+    const tapGeo = new THREE.BoxGeometry(1.55, 1.30, 1.05);
+    kioskTapFill = new THREE.Mesh(tapGeo, new THREE.MeshBasicMaterial({
+      color:0x3ddc84, transparent:true, opacity:0.10, depthWrite:false, side:THREE.DoubleSide }));
+    kioskTapFill.renderOrder = 7;
+    kioskTap.add(kioskTapFill);
+    kioskTapEdge = new THREE.LineSegments(new THREE.EdgesGeometry(tapGeo),
+      new THREE.LineBasicMaterial({ color:0x3ddc84, transparent:true, opacity:0.85, depthTest:false }));
+    kioskTapEdge.renderOrder = 8;
+    kioskTap.add(kioskTapEdge);
+    kioskTap.position.set(LUN.KIOSK.x, LUN.KIOSK.y - 0.16, LUN.KIOSK.z - 0.10);
+    kioskTap.visible = false;
+    group.add(kioskTap);
     // signage bands
     function band(txt, w, h, x, y, z){
       const m = new THREE.Mesh(new THREE.PlaneGeometry(w,h),
@@ -5610,6 +5658,17 @@ const Lunch = (function(){
     kioskTex.needsUpdate = true;
   }
   function setHalo(v){ if (kioskHalo) kioskHalo.material.opacity = v; }
+  function tapBox(){ return kioskTap; }
+  function setTapBox(show, hot, pulse){
+    if (!kioskTap) return;
+    kioskTap.visible = !!show;
+    if (!show) return;
+    const c = hot ? 0xffd23f : 0x3ddc84;
+    kioskTapFill.material.color.setHex(c);
+    kioskTapEdge.material.color.setHex(c);
+    kioskTapFill.material.opacity = hot ? 0.085 + 0.045*pulse : 0.05;
+    kioskTapEdge.material.opacity = hot ? 0.85 + 0.15*pulse : 0.40;
+  }
   function stepBeacon(t, show){
     if (!kioskBeacon) return;
     kioskBeacon.visible = show;
@@ -5627,7 +5686,7 @@ const Lunch = (function(){
       s.logo.rotation.y = s.mesh.rotation.y;
     }
   }
-  return { build, reset, S, A, win, stockLeft, nextItem, paintKiosk, setHalo, stepBeacon, idleStaff,
+  return { build, reset, S, A, win, stockLeft, nextItem, paintKiosk, setHalo, tapBox, setTapBox, stepBeacon, idleStaff,
            get P(){ return P; }, get group(){ return group; },
            get teacherMesh(){ return teacherMesh; } };
 })();
@@ -5697,10 +5756,11 @@ function lunchKiosk(){
   while (dyaw >  Math.PI) dyaw -= Math.PI*2;
   while (dyaw < -Math.PI) dyaw += Math.PI*2;
   const dpitch = Math.atan2(K.y - eye, horiz) - pitch;
-  // the closer you stand the more of the screen you fill, so the cone opens up with you
-  const tol = Math.atan2(0.30, horiz) + 0.12;
+  // the closer you stand the more of the screen you fill, so the cone opens up with you.
+  // on a touchscreen you tap the big glass box instead, so both are far more forgiving.
+  const tol = TOUCH.on ? (Math.atan2(0.95, horiz) + 0.30) : (Math.atan2(0.30, horiz) + 0.12);
   const aimed = Math.abs(dyaw) < tol && Math.abs(dpitch) < tol;
-  const near   = d <= LUN.REACH;
+  const near   = d <= (TOUCH.on ? LUN.REACH_TOUCH : LUN.REACH);
   let state = 'idle';
   if (Lunch.stockLeft() <= 0) state = 'sold';
   else if (S.barred)          state = 'barred';
@@ -5871,6 +5931,11 @@ function updateLunch(dt){
     S.kiosk = K;
     if (clickEdge && K.ready){ clickEdge=false; shovePressed=false; lunchOrder(); }
     else if (eEdge && K.ready){ eEdge=false; lunchOrder(); }
+    // a phone tap that landed on the glass box counts, even off to one side
+    else if (TOUCH.kioskTap && K.near && K.state !== 'wait' && K.state !== 'barred'){
+      shovePressed = false; lunchOrder();
+    }
+    TOUCH.kioskTap = false;
 
     // shove
     shoveCD -= dt;
@@ -6200,6 +6265,8 @@ function updateLunch(dt){
   const KS = S.kiosk || lunchKiosk();
   Lunch.paintKiosk(KS.state);
   Lunch.setHalo(KS.ready ? 0.60 + Math.sin(S.t*7)*0.25 : (KS.near ? 0.20 : 0));
+  Lunch.setTapBox(TOUCH.on && !P.served && Lunch.stockLeft() > 0 && !S.done,
+                  KS.near, (Math.sin(S.t*6)+1)/2);
   lunchUpdateRagdolls(dt);
   spaceEdge = 0; clickEdge = false; eEdge = false; qEdge = false;
   for (const k in edges) delete edges[k];
@@ -7748,7 +7815,8 @@ function updateHUD(){
       th.className = 'dim'; th.innerHTML = 'LOOK AT THE KIOSK'; th.style.opacity = 1;
     } else if (!S.got && Lunch.stockLeft()>0 && K.d < 3.2 && S.det<=0){
       th.className = 'dim';
-      th.innerHTML = 'GET TO THE KIOSK<small>THEN CLICK TO ORDER</small>';
+      th.innerHTML = 'GET TO THE KIOSK<small>'
+        + (TOUCH.on ? 'THEN TAP THE GREEN BOX' : 'THEN CLICK TO ORDER') + '</small>';
       th.style.opacity = 1;
     } else th.style.opacity = 0;
     $('hudLeft').style.display='none'; $('hudRight').style.display='none';
@@ -8634,7 +8702,7 @@ async function lbSend(mine){
    does not know the difference.
    ============================================================ */
 const TOUCH = {
-  on:false, mv:null, run:false, back:false,
+  on:false, mv:null, run:false, back:false, lesson:0, kioskTap:false, mvTap:0, mx:0, my:0,
   mvId:null, lookId:null, ox:0, oy:0, lx:0, ly:0, ldist:0, lt:0, sig:' '
 };
 function lockPointer(){
@@ -8655,6 +8723,7 @@ function tuiSetStick(dx, dy){
   const knob = $('tuiStick').firstElementChild;
   knob.style.transform = 'translate(' + (dx*k).toFixed(1) + 'px,' + (dy*k).toFixed(1) + 'px)';
   const mag = Math.min(1, d/TUI_R);
+  if (d > 14) TOUCH.mvTap = 0;                 // it became a drag, not a tap
   if (mag < 0.20){ TOUCH.mv = null; TOUCH.run = false; TOUCH.back = false; }
   else {
     const n = Math.max(d, 0.0001);
@@ -8674,6 +8743,8 @@ function tuiTouchStart(e){
   for (const t of e.changedTouches){
     if (t.clientX < innerWidth*0.5 && TOUCH.mvId === null){
       TOUCH.mvId = t.identifier; TOUCH.ox = t.clientX; TOUCH.oy = t.clientY;
+      TOUCH.mx = t.clientX; TOUCH.my = t.clientY;
+      TOUCH.mvTap = performance.now();
       const st = $('tuiStick');
       st.style.left = t.clientX + 'px'; st.style.top = t.clientY + 'px';
       st.classList.remove('hidden');
@@ -8692,6 +8763,7 @@ function tuiTouchMove(e){
   for (const t of e.changedTouches){
     if (t.identifier === TOUCH.mvId){
       mine = true;
+      TOUCH.mx = t.clientX; TOUCH.my = t.clientY;
       tuiSetStick(t.clientX - TOUCH.ox, t.clientY - TOUCH.oy);
     } else if (t.identifier === TOUCH.lookId){
       mine = true;
@@ -8706,12 +8778,33 @@ function tuiTouchMove(e){
   }
   if (mine && e.cancelable) e.preventDefault();   // otherwise let the page scroll normally
 }
+const TUI_TAP_MS = 600;         // a deliberate press on a target is still a tap
+const _tuiRay = new THREE.Raycaster();
+const _tuiPt  = new THREE.Vector2();
+function tuiHitKiosk(cx, cy){
+  if (G.mode !== 'lunch') return false;
+  const box = Lunch.tapBox && Lunch.tapBox();
+  if (!box || !box.visible) return false;
+  _tuiPt.x =  (cx / innerWidth)  * 2 - 1;
+  _tuiPt.y = -(cy / innerHeight) * 2 + 1;
+  _tuiRay.setFromCamera(_tuiPt, camera);
+  return _tuiRay.intersectObject(box, true).length > 0;
+}
 function tuiTouchEnd(e){
   for (const t of e.changedTouches){
-    if (t.identifier === TOUCH.mvId) tuiDropStick();
+    const tap = performance.now() - TOUCH.lt < TUI_TAP_MS;
+    if (t.identifier === TOUCH.mvId){
+      // a quick tap on the stick side still counts if it landed on the kiosk
+      if (TOUCH.mvTap && performance.now() - TOUCH.mvTap < TUI_TAP_MS && tuiHitKiosk(TOUCH.mx, TOUCH.my))
+        TOUCH.kioskTap = true;
+      tuiDropStick();
+    }
     else if (t.identifier === TOUCH.lookId){
       // a tap that did not really move counts as a click: waking up, popping words
-      if (TOUCH.ldist < 16 && performance.now() - TOUCH.lt < 320) clickEdge = true;
+      if (TOUCH.ldist < 16 && tap){
+        clickEdge = true;
+        if (tuiHitKiosk(TOUCH.lx, TOUCH.ly)) TOUCH.kioskTap = true;
+      }
       TOUCH.lookId = null;
     }
   }
@@ -8746,9 +8839,9 @@ function tuiSpec(){
     const S = Hall.S;
     if (S.done) return [];
     const a = [];
-    if (S.phase === 'rush') a.push(['SIT','KeyE']);
-    a.push([S.standL + '~STAND', 'Key' + S.standL]);
-    a.push([S.clapL  + '~CLAP',  'Key' + S.clapL]);
+    if (S.phase === 'rush' && !Hall.P.seated) a.push(['SIT','KeyE']);
+    a.push([S.standL + '~STAND', 'Key' + S.standL, 'secret']);
+    a.push([S.clapL  + '~CLAP',  'Key' + S.clapL,  'secret']);
     if (S.phoneT > 0 && S.phoneMine) a.push(['QUIET','KeyQ']);
     if (S.sleeping) a.push(['WAKE UP','tap']);
     if (S.phase === 'leaving') a.push(['PUSH','Space']);
@@ -8774,8 +8867,19 @@ function tuiLabel(t){
   const i = t.indexOf('~');                   // "J~STAND" -> big J over a small STAND
   return i < 0 ? t : t.slice(0,i) + '<br><small>' + t.slice(i+1) + '</small>';
 }
+const TUI_LESSON_MS = 8000;
+function tuiSitLesson(){
+  if (!TOUCH.on || TOUCH.lesson) return;
+  TOUCH.lesson = performance.now();
+  const t = $('tuiTitle');
+  t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 3600);
+}
 function updateTouchUI(){
   if (!TOUCH.on) return;
+  // once the eight seconds are up the letters go and you are on your own
+  $('tuiPad').classList.toggle('hushed',
+    !!TOUCH.lesson && performance.now() - TOUCH.lesson > TUI_LESSON_MS);
   const spec = tuiSpec();
   const sig = spec.map(x => x[0] + ':' + x[1] + ':' + (x[2]||'')).join('|');
   if (sig === TOUCH.sig) return;
@@ -8784,7 +8888,7 @@ function updateTouchUI(){
   $('tui').style.setProperty('--cols', spec.length > 3 ? 2 : Math.max(1, spec.length));
   pad.innerHTML = spec.map(function(it, i){
     return '<div class="tb' + (it[2] ? ' ' + it[2] : '') + '" data-i="' + i + '">'
-         + tuiLabel(it[0]) + '</div>';
+         + '<span class="lab">' + tuiLabel(it[0]) + '</span></div>';
   }).join('');
   for (const el of pad.children){
     const act = spec[+el.dataset.i][1];
@@ -8821,6 +8925,7 @@ window.__BBB = { G, camera, buses, agents, scene, renderer, Audio_,
   LB, lbOn, lbClean, lbFetch, lbSubmit, lbOpen, lbClose, lbSend, lbRender, lbMine(){ return lbMine(); },
   lbCount, lbPlacing, lbFinish,
   TOUCH, tuiSpec, updateTouchUI, tuiPress,
+  lunchKiosk, tuiHitKiosk, LUN, Lunch,
   boardTexture, BOARD_CREDITS, BOARD_PREFECTS, BOARD_SUPPORTERS, Hall,
   get playerName(){ return PLAYER_NAME; }, setPlayerName(n){ PLAYER_NAME = n; },
   showResult(){ showResult(); },
