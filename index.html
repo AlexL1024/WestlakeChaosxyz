@@ -151,7 +151,7 @@
   .detFoot { font-size:11px; color:#6f829c; margin-top:4px; letter-spacing:.4px; }
   /* the reflection sheet they make you fill in */
   #detCard { width:min(560px,92vw); }
-  #detCard.writing .detClock { display:none; }   /* no clock until the sheet is in */
+  .detClock { display:none; }        /* the sheet decides when you leave, not a clock */
   #detSheet { margin-top:12px; pointer-events:auto; text-align:left; }
   .dqTop { display:flex; justify-content:space-between; align-items:baseline;
     font-size:10px; letter-spacing:2.6px; text-transform:uppercase; color:#8fa3c0; margin-bottom:9px; }
@@ -543,7 +543,7 @@
       <div class="dqOpts" id="dqOpts"></div>
       <div class="dqMark" id="dqMark"></div>
     </div>
-    <div class="detFoot" id="detFoot">Answer every question. Then the door unlocks.</div>
+    <div class="detFoot" id="detFoot">Answer all four. Then you can go.</div>
   </div>
 </div>
 <div id="lunchStock" class="hidden">
@@ -4058,19 +4058,21 @@ function buildGDATeacher(){
   return b.build();
 }
 
+const GDA_LOOK_MAX = 5.0;      // he never stands over you for more than five seconds
 const GDAScene = (function(){
   let group=null, built=false, teacher=null, screenTex=null, screenCanvas=null, docCan=null;
   const others=[];
   const S = { t:0, aura:0, screen:'doc', dinoScore:0, caught:0, checks:0,
               nextCheck:0, look:0, mode:'idle', warned:false, done:false,
               scare:0, scareSnap:false, jump:0, busted:0, recover:0 };
-  const T = { x:-2.45, z:0, tx:-2.45, tz:0, speed:0.55, face:0, hurry:false, dwell:0, stepAcc:0 };
+  const T = { x:-2.45, z:0, tx:-2.45, tz:0, speed:0.55, face:0, hurry:false, dwell:0, stepAcc:0,
+              visit:false, stay:0 };
   // jv/g tuned so the apex ( jv^2/(2g) * 46px = ~85px ) clears the tall cactus (42px)
   // with a ~320ms window to time the press. Old values (3.1 / 11) topped out at 20px.
   /* The real Chrome dinosaur ramps from 6 to 13 at 0.001 per frame — about 0.06 a
      second — so it takes roughly two minutes to reach top speed.  That long, barely
      perceptible build is the whole feel of the thing.  Same curve here, in our units. */
-  const DINO_V0 = 7.4, DINO_VMAX = 15;
+const DINO_V0 = 7.4, DINO_VMAX = 15;
   const DINO_ACCEL = (DINO_VMAX - DINO_V0) * 0.06 / (13 - 6);      // ≈ 0.065 / s
   const D = { y:0, vy:0, run:0, obs:[], dead:0, speed:DINO_V0, blink:0, jv:8.6, g:20, pop:0 };
   const PB = BANKS[PLAYER_BANK], PZ = GDA_Z0 + PLAYER_ROW*GDA_ZP;
@@ -4169,10 +4171,24 @@ const GDAScene = (function(){
     group.visible = true;
     S.t=0; S.aura=0; S.screen='doc'; S.dinoScore=0; S.caught=0; S.checks=0;
     S.nextCheck=rand(6,9); S.look=0; S.mode='run'; S.done=false; S.warned=false;
+    /* Mr O'Brien comes over two or three times in the hour, and exactly one of
+       those is at a jog.  The rest of the time he is up the front of the room. */
+    S.visits = [];
+    {
+      const n = rint(2,3);
+      const at = [];
+      let t = rand(9, 14);
+      for (let i=0;i<n;i++){ at.push(t); t += rand(13, 18); }
+      const last = at[at.length-1];
+      if (last > 52){ const k = 52/last; for (let i=0;i<at.length;i++) at[i] *= k; }
+      const runIdx = rint(0, n-1);
+      for (let i=0;i<n;i++) S.visits.push({ t: at[i], run: i === runIdx });
+    }
     S.scare=0; S.scareSnap=false; S.jump=0; S.busted=0; S.recover=0;
     document.getElementById('jumpFx').classList.add('hidden');
     camShakeX = 0; camShakeY = 0;                 // Game Dev never shakes the camera
     T.x=AISLES[0]; T.z=GDA_Z0-1.2; T.tx=T.x; T.tz=T.z; T.speed=0.55; T.hurry=false; T.dwell=0; T.stepAcc=0;
+    T.visit=false; T.stay=0;
     S.cleared=0;
     D.y=0; D.vy=0; D.run=0; D.obs=[]; D.dead=0; D.speed=DINO_V0; D.pop=0;
     teacher.position.set(T.x, 0, T.z); teacher.rotation.y=0;
@@ -4232,18 +4248,32 @@ function updateGDA(dt){
   if (D.pop>0) D.pop = Math.max(0, D.pop - dt*1.15);
   G0.drawScreen();
 
-  /* ---- the teacher ---- */
-  if (S.scare<=0) S.nextCheck -= dt;
-  if (S.nextCheck<=0 && S.mode==='run' && S.scare<=0){
-    S.checks++;
-    const straightAtYou = Math.random()<0.3;
-    T.hurry = straightAtYou;
-    T.speed = straightAtYou ? 1.85 : rand(0.45,0.7);
-    T.tx = straightAtYou ? G0.AISLES[0] : pick(G0.AISLES);
-    T.tz = straightAtYou ? PZ : GDA_Z0 + rand(-1.2, (GDA_ROWS-1)*GDA_ZP+1.0);
+  /* ---- Mr O'Brien ---- */
+  // somewhere to stand that is nowhere near your monitor
+  function gdaAwayZ(){
+    for (let i=0;i<10;i++){
+      const z = GDA_Z0 + rand(-1.2, (GDA_ROWS-1)*GDA_ZP+1.0);
+      if (Math.abs(z - PZ) > 4.0) return z;
+    }
+    return GDA_Z0 - 1.2;
+  }
+  function gdaWanderOff(){
+    T.visit = false; T.stay = 0; T.hurry = false;
+    T.speed = rand(0.45,0.7);
+    T.tx = pick(G0.AISLES);
+    T.tz = gdaAwayZ();
     T.dwell = 0;
-    S.nextCheck = rand(8.5, 13.5) + (straightAtYou?2:0);
-    if (straightAtYou) Audio_.bump();
+  }
+  if (S.mode==='run' && S.scare<=0 && !T.visit && S.visits && S.visits.length
+      && S.t >= S.visits[0].t){
+    const v = S.visits.shift();
+    S.checks++;
+    T.visit = true; T.stay = 0;
+    T.hurry = v.run;
+    T.speed = v.run ? 1.85 : 1.25;
+    T.tx = G0.AISLES[0]; T.tz = PZ;
+    T.dwell = 0;
+    if (v.run) Audio_.bump();
   }
   const ddx = T.tx-T.x, ddz = T.tz-T.z, dd = Math.hypot(ddx,ddz);
   if (dd > 0.06 && S.scare<=0){
@@ -4262,6 +4292,11 @@ function updateGDA(dt){
     const look = Math.atan2(PX-T.x, PZ-T.z);
     let df = look - T.face; while(df>Math.PI)df-=Math.PI*2; while(df<-Math.PI)df+=Math.PI*2;
     T.face += df*Math.min(1, dt*3.5);
+    // he only ever stands over you for so long
+    if (T.visit && S.scare<=0){
+      T.stay += dt;
+      if (T.stay >= GDA_LOOK_MAX) gdaWanderOff();
+    }
   }
   teacherMesh: {
     const m = G0.teacher;
@@ -4296,10 +4331,7 @@ function updateGDA(dt){
     G0.teacher.position.set(T.x, 0, T.z);
     G0.teacher.rotation.y = T.face;
     if (S.scare<=0){                                   // ...and he strolls back off
-      T.tx = pick(G0.AISLES);
-      T.tz = GDA_Z0 + rand(-1.2, (GDA_ROWS-1)*GDA_ZP+1.0);
-      T.speed = rand(0.45,0.7); T.hurry = false; T.dwell = 0;
-      S.nextCheck = rand(7.0, 11.0);
+      gdaWanderOff();
       S.recover = 0.85;                                // let you turn back to your monitor
     }
   }
@@ -5855,7 +5887,7 @@ function lunchBar(reason){
 }
 function lunchDetentionStart(){
   fadeTo(()=>{
-    Lunch.S.det = 10.0;
+    Lunch.S.det = 30.0;            // only a backstop; the sheet is what lets you out
     G.det = { batch: detNextBatch(), i:0, right:0, locked:false, done:false, until:0 };
     Lunch.group.visible = false;
     detRoomEnter();
@@ -5895,20 +5927,16 @@ function updateLunch(dt){
     if (S.ejecting <= 0){ S.ejecting = 0; lunchDetentionStart(); }
   }
   if (S.det > 0){
-    const sheetDone = !G.det || G.det.done;
-    if (sheetDone){
-      S.det -= dt;
-      // lunch does not wait for you — the queue keeps moving while you sit in there
-      S.detServe = (S.detServe||0) + dt;
-      while (S.detServe > LUN.SERVE_T/3){
-        S.detServe -= LUN.SERVE_T/3;
-        const it = Lunch.nextItem();
-        if (!it) break;
-        S.stock[it]--; S.served++;
-      }
+    S.det -= dt;
+    // lunch does not wait for you — the queue keeps moving while you fill in the sheet
+    S.detServe = (S.detServe||0) + dt;
+    while (S.detServe > LUN.SERVE_T/3){
+      S.detServe -= LUN.SERVE_T/3;
+      const it = Lunch.nextItem();
+      if (!it) break;
+      S.stock[it]--; S.served++;
     }
-    const el=$('detTimer'); if (el) el.textContent = sheetDone ? Math.max(0, Math.ceil(S.det)) : '\u2014';
-    if (sheetDone && S.det <= 0) lunchDetentionEnd();
+    if (S.det <= 0) lunchDetentionEnd();
     if (S.scold>0){ S.scold = Math.max(0, S.scold - dt*0.9);
       const j=$('jumpFx'); if (j){ j.style.opacity=Math.min(1,S.scold*1.5); j.classList.toggle('hidden', S.scold<=0); } }
     return;                                      // the courtyard carries on without you
@@ -6746,10 +6774,8 @@ function detShow(){
   const D = G.det;
   const Q = DET_QS[D.batch[D.i]];
   $('detSheet').classList.remove('hidden');
-  $('detCard').classList.add('writing');
-  $('dqNum').textContent = (D.i+1) + ' of ' + D.batch.length;
-  $('dqScore').textContent = (D.right>0?'+':'') + D.right;
-  $('dqScore').className = D.right < 0 ? 'bad' : '';
+  $('dqNum').textContent = 'Question ' + (D.i+1) + ' of ' + D.batch.length;
+  $('dqScore').textContent = D.right + '/' + D.batch.length;
   $('dqQ').textContent = Q.q;
   $('dqOpts').innerHTML = Q.a.map(function(t,i){
     return '<div class="dqOpt" data-i="'+i+'"><u>'+(i+1)+'</u><span>'+t+'</span></div>'; }).join('');
@@ -6774,11 +6800,14 @@ function detAnswer(n){
   const m = $('dqMark');
   m.textContent = (ok ? 'CORRECT \u2014 ' : 'WRONG \u2014 ') + Q.why;
   m.className = 'dqMark ' + (ok ? 'right' : 'wrong');
-  if (ok){ D.right++; logAura('Got one right in detention', 1); Audio_.point(); }
-  else   { D.right--; logAura('Got one wrong in detention', -1); Audio_.bump(); }
-  $('dqScore').textContent = (D.right>0?'+':'') + D.right;
-  $('dqScore').className = D.right < 0 ? 'bad' : '';
+  // no aura in here — detention is its own punishment
+  if (ok){ D.right++; Audio_.point(); } else Audio_.bump();
+  $('dqScore').textContent = D.right + '/' + D.batch.length;
   D.until = performance.now() + 1900;
+}
+function detFinishRoom(){
+  if (G.inDetention){ G.detention = 0; endDetention(); }
+  else if (Lunch.S.det > 0){ Lunch.S.det = 0; lunchDetentionEnd(); }
 }
 function detStep(){
   const D = G.det;
@@ -6788,11 +6817,10 @@ function detStep(){
   if (D.i >= D.batch.length){
     D.done = true;
     $('detSheet').classList.add('hidden');
-    $('detCard').classList.remove('writing');
     $('dqMark').textContent = '';
     const f = $('detFoot');
-    if (f) f.textContent = 'Sheet done \u2014 ' + (D.right>0?'+':'') + D.right
-      + ' aura. Now wait for the door.';
+    if (f) f.textContent = 'Sheet in \u2014 ' + D.right + ' of ' + D.batch.length + ' right. Off you go.';
+    detFinishRoom();                       // four questions done, out you go
   } else detShow();
 }
 
@@ -6832,7 +6860,9 @@ function detRoomEnter(){
   detention.group.visible = false;
   drawDetPaper(ExamScene.paper); ExamScene.paperNeedsUpdate();
   _detLight = { s: sun.intensity, h: hemi.intensity };
-  _detUI = { ui: $('ui').style.display, cue: $('keyCue').classList.contains('hidden') };
+  _detUI = { ui: $('ui').style.display, cue: $('keyCue').classList.contains('hidden'),
+             stock: $('lunchStock').classList.contains('hidden') };
+  $('lunchStock').classList.add('hidden');
   sun.intensity = 0.42; hemi.intensity = 0.52;
   $('ui').style.display = 'none';
   $('keyCue').classList.add('hidden');
@@ -6844,6 +6874,7 @@ function detRoomLeave(){
   if (_detUI){
     $('ui').style.display = _detUI.ui;
     $('keyCue').classList.toggle('hidden', _detUI.cue);
+    $('lunchStock').classList.toggle('hidden', _detUI.stock);
     _detUI = null;
   }
 }
@@ -6867,7 +6898,7 @@ function sendToDetention(reason){
 }
 function startDetention(){
   fadeTo(()=>{
-    G.inDetention = true; G.detention = 4.0;
+    G.inDetention = true; G.detention = 30.0;
     G.det = { batch: detNextBatch(), i:0, right:0, locked:false, done:false, until:0 };
     const i = agents.indexOf(player); if (i>=0) agents.splice(i,1);
     detRoomEnter();
@@ -6899,13 +6930,8 @@ function updatePunish(dt){
     if (G.ejecting <= 0){ G.ejecting = 0; startDetention(); }
   }
   if (G.inDetention){
-    // the clock only starts once the sheet is finished
-    const D = G.det;
-    const free = !D || D.done;
-    if (free) G.detention -= dt;
-    const el = $('detTimer');
-    if (el) el.textContent = free ? Math.max(0, Math.ceil(G.detention)) : '\u2014';
-    if (free && G.detention <= 0) endDetention();
+    G.detention -= dt;                    // a backstop, in case the sheet never finishes
+    if (G.detention <= 0) endDetention();
   }
 }
 function seatTier(rank){
@@ -9166,6 +9192,7 @@ window.__BBB = { G, camera, buses, agents, scene, renderer, Audio_,
   lbCount, lbPlacing, lbFinish,
   TOUCH, tuiSpec, updateTouchUI, tuiPress,
   sendToDetention, startDetention, detAnswer, DET_QS, goToBay,
+  lunchDetentionStart,
   detShow,
   ExamScene, EXAM_Y,
   AURA_LOG,
@@ -9210,6 +9237,7 @@ window.__BBB = { G, camera, buses, agents, scene, renderer, Audio_,
   hallKey(code){ edges[code] = (edges[code]||0)+1; },
   hallKeys(){ return {stand:Hall.S.standKey, clap:Hall.S.clapKey, sl:Hall.S.standL, cl:Hall.S.clapL}; },
   GDAScene, GDA, GDA_Y, startGDA(){ startGDA(); }, skipClass(){ skipClass(); },
+  stepGDA(dt){ G.total+=dt; updateGDA(dt); },
   ExamScene, EXM, EXAM_Y, EXAM_QS, EXAM_PENS_DOWN, EXAM_OVER, EXAM_READ_END,
   FIN, FIN_GOOD, FIN_BAD, sealAura(){ return sealAura(); },
   startFinale(k,t){ startFinale(k,t); },
