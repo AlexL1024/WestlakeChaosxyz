@@ -149,6 +149,37 @@
   .detClock { font-size:52px; font-weight:900; color:#ffd23f; line-height:1.05; margin-top:6px; }
   .detClock em { font-style:normal; font-size:20px; color:#8fa3c0; margin-left:3px; }
   .detFoot { font-size:11px; color:#6f829c; margin-top:4px; letter-spacing:.4px; }
+  /* the reflection sheet they make you fill in */
+  #detCard { width:min(560px,92vw); }
+  #detSheet { margin-top:12px; pointer-events:auto; text-align:left; }
+  .dqTop { display:flex; justify-content:space-between; align-items:baseline;
+    font-size:10px; letter-spacing:2.6px; text-transform:uppercase; color:#8fa3c0; margin-bottom:9px; }
+  .dqTop b { font-size:15px; font-weight:900; color:#3ddc84; letter-spacing:0; }
+  .dqTop b.bad { color:#ff6a5a; }
+  .dqQ { font-size:17px; font-weight:800; color:#fff; line-height:1.4; margin-bottom:12px; }
+  .dqOpts { display:flex; flex-direction:column; gap:8px; }
+  .dqOpt { display:flex; align-items:center; gap:11px; padding:11px 13px; border-radius:11px;
+    background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.16);
+    font-size:14px; font-weight:700; color:#e6eefa; line-height:1.35; cursor:pointer;
+    -webkit-tap-highlight-color:transparent; transition:background .12s, border-color .12s; }
+  .dqOpt u { flex:0 0 24px; height:24px; border-radius:6px; display:flex; align-items:center;
+    justify-content:center; text-decoration:none; font-size:12px; font-weight:900; color:#10151f;
+    background:#ffd23f; }
+  .dqOpt:hover { background:rgba(255,255,255,.11); }
+  .dqOpt.right { background:rgba(61,220,132,.20); border-color:#3ddc84; color:#fff; }
+  .dqOpt.wrong { background:rgba(255,106,90,.18); border-color:#ff6a5a; color:#fff; }
+  .dqOpt.right u { background:#3ddc84; } .dqOpt.wrong u { background:#ff6a5a; color:#fff; }
+  .dqMark { min-height:19px; margin-top:9px; font-size:12.5px; font-weight:800;
+    letter-spacing:.6px; color:#8fa3c0; }
+  .dqMark.right { color:#3ddc84; } .dqMark.wrong { color:#ff6a5a; }
+  body.touch .dqQ { font-size:15px; }
+  body.touch .dqOpt { font-size:13px; padding:10px 12px; }
+  @media (max-height:560px){
+    #detOver { top:10px; }
+    .detTitle { font-size:22px; } .detClock { display:none; }
+    .dqQ { font-size:14px; margin-bottom:8px; } .dqOpt { padding:8px 11px; font-size:12.5px; }
+    .dqOpts { gap:6px; }
+  }
   #lunchStock { position:fixed; right:18px; top:104px; z-index:12; pointer-events:none;
     background:rgba(8,14,26,.72); border:1px solid rgba(255,255,255,.14); border-radius:12px;
     padding:12px 14px 10px; backdrop-filter:blur(8px); min-width:212px; }
@@ -285,7 +316,14 @@
   #startTouch span { display:block; font-size:13.5px; font-weight:700; color:#cfe6d8; line-height:1.75; }
   #startTouch span em { font-style:normal; color:#3ddc84; }
   body.touch #keyCue { display:none !important; }
-  body.touch #hallSit { font-size:14px; }
+  body.touch #hallSit, body.touch #ridePrompt { display:none !important; }
+  #tuiPad .tb.dim { opacity:.40; }
+  /* a full-width gold pill for the one button that ends the day */
+  #tuiPad .tb.wide { width:100%; height:auto; min-height:60px; border-radius:16px;
+    padding:12px 16px; font-size:14px; letter-spacing:1.6px; line-height:1.25;
+    color:#10151f; background:#ffd23f; border-color:#ffd23f;
+    text-shadow:none; box-shadow:0 8px 26px rgba(255,210,63,.28); }
+  #tuiPad .tb.wide.on { background:#fff; border-color:#fff; transform:scale(.97); }
 
   #tui { position:fixed; inset:0; z-index:14; pointer-events:none;
     -webkit-user-select:none; user-select:none; }
@@ -494,9 +532,15 @@
   <div id="detCard">
     <div class="detTag">Westlake Boys High School</div>
     <div class="detTitle">DETENTION</div>
-    <div class="detSub">Room 14 &middot; for pushing on the bus bay</div>
+    <div class="detSub">Room 14 &middot; fill in the sheet before you go</div>
     <div class="detClock"><span id="detTimer">10</span><em>s</em></div>
-    <div class="detFoot">The door unlocks when the timer runs out.</div>
+    <div id="detSheet" class="hidden">
+      <div class="dqTop"><span id="dqNum">1 of 4</span><b id="dqScore">0</b></div>
+      <div class="dqQ" id="dqQ"></div>
+      <div class="dqOpts" id="dqOpts"></div>
+      <div class="dqMark" id="dqMark"></div>
+    </div>
+    <div class="detFoot" id="detFoot">Answer every question. Then the door unlocks.</div>
   </div>
 </div>
 <div id="lunchStock" class="hidden">
@@ -3155,7 +3199,7 @@ const Hall = (function(){
       list[rint(0,3)] = who;
     })();
     S.openI   = 0; S.said2 = false; S.said3 = false;
-    S.vape = Math.random() < 0.2;           // one assembly in five
+    S.vape = Math.random() < 0.5;           // every second assembly, near enough
     S.vapeStep = 0; S.vaper = null;
     S.cap=''; S.capWho='';
     deputy.position.set(STAGE_STAFF_X0 + STAGE_SEAT_P, HALL.STAGE_Y, HALL.ZF-2.6); deputy.rotation.y=0;
@@ -3544,6 +3588,7 @@ function updateHall(dt){
     let bd=1.15;
     for (const s of seats){ if (s.taken) continue;
       const d=Math.hypot(s.x-P.x, s.z-P.z); if (d<bd){ bd=d; nearSeat=s; } }
+    S.nearSeat = !!nearSeat;
     $('hallSit').style.opacity = nearSeat ? 1 : 0;
     if (nearSeat && eEdge){
       nearSeat.taken=true; P.seat=nearSeat; P.seated=true; P.standing=false;
@@ -3551,11 +3596,11 @@ function updateHall(dt){
       if (nearSeat.prefect){ S.prefect = true;
         banner('THE PREFECTS\u2019 SEATS.', 'Everything doubles \u2014 but one slip and the whole school finds out', 4200); }
       banner('ROW '+(nearSeat.row+1)+'.', '+'+Hall.seatAura(nearSeat.row)+' aura for the seat', 2400);
-      $('hallSit').style.opacity=0;
+      S.nearSeat = false; $('hallSit').style.opacity=0;
       if (!S.hintShown){ S.hintShown=true; Hall.showKeyHint(false); }
       tuiSitLesson();
     }
-  } else $('hallSit').style.opacity = 0;
+  } else { S.nearSeat = false; $('hallSit').style.opacity = 0; }
 
   /* ---- everyone up / everyone down ---- */
   function crowdStand(up){
@@ -5806,6 +5851,7 @@ function lunchBar(reason){
 function lunchDetentionStart(){
   fadeTo(()=>{
     Lunch.S.det = 10.0;
+    G.det = { batch: detNextBatch(), i:0, right:0, locked:false, done:false, until:0 };
     Lunch.group.visible = false;
     detention.group.visible = true;
     detention.door.rotation.y = 0;
@@ -5813,6 +5859,8 @@ function lunchDetentionStart(){
     pressure = 0; camShakeX = camShakeY = 0;
     $('detOver').classList.remove('hidden');
     $('detTimer').textContent = '10';
+    $('detSheet').classList.add('hidden');
+    detShow();
   });
 }
 function lunchDetentionEnd(){
@@ -5845,18 +5893,21 @@ function updateLunch(dt){
     if (S.ejecting <= 0){ S.ejecting = 0; lunchDetentionStart(); }
   }
   if (S.det > 0){
-    S.det -= dt;
-    // lunch does not wait for you — the queue keeps moving while you sit in there
-    S.detServe = (S.detServe||0) + dt;
-    while (S.detServe > LUN.SERVE_T/3){
-      S.detServe -= LUN.SERVE_T/3;
-      const it = Lunch.nextItem();
-      if (!it) break;
-      S.stock[it]--; S.served++;
+    const sheetDone = !G.det || G.det.done;
+    if (sheetDone){
+      S.det -= dt;
+      // lunch does not wait for you — the queue keeps moving while you sit in there
+      S.detServe = (S.detServe||0) + dt;
+      while (S.detServe > LUN.SERVE_T/3){
+        S.detServe -= LUN.SERVE_T/3;
+        const it = Lunch.nextItem();
+        if (!it) break;
+        S.stock[it]--; S.served++;
+      }
     }
-    const el=$('detTimer'); if (el) el.textContent = Math.max(0, Math.ceil(S.det));
-    if (S.det <= 1.1) detention.door.rotation.y = lerp(detention.door.rotation.y, -1.65, Math.min(1, dt*3.6));
-    if (S.det <= 0) lunchDetentionEnd();
+    const el=$('detTimer'); if (el) el.textContent = sheetDone ? Math.max(0, Math.ceil(S.det)) : '\u2014';
+    if (sheetDone && S.det <= 1.1) detention.door.rotation.y = lerp(detention.door.rotation.y, -1.65, Math.min(1, dt*3.6));
+    if (sheetDone && S.det <= 0) lunchDetentionEnd();
     if (S.scold>0){ S.scold = Math.max(0, S.scold - dt*0.9);
       const j=$('jumpFx'); if (j){ j.style.opacity=Math.min(1,S.scold*1.5); j.classList.toggle('hidden', S.scold<=0); } }
     return;                                      // the courtyard carries on without you
@@ -6648,6 +6699,100 @@ function fadeTo(cb){
   const f=$('fade'); f.style.opacity=1;
   setTimeout(()=>{ cb(); setTimeout(()=>{ f.style.opacity=0; }, 70); }, 350);
 }
+/* ============================================================
+   THE DETENTION SHEET
+   Eight questions, shuffled, four per detention.  Sit another one
+   and you get the four you have not had yet.
+   ============================================================ */
+const DET_QS = [
+  { q:'Do you use AI tools to do any assessments?',
+    a:['No \u2014 it replaces thinking', 'Yes \u2014 it is the future, people should adapt'],
+    c:0, why:'Correct. Write that out again, twenty times.' },
+  { q:'The developer took three afternoons to make this using AI.',
+    a:['True', 'False'], c:0, why:'True. Three afternoons.' },
+  { q:'Should you use AI to code?',
+    a:['No \u2014 because the school said so', 'Yes \u2014 developers use them'],
+    c:0, why:'Because the school said so. That is the whole reason.' },
+  { q:'Which of these is not widely recognised at school?',
+    a:['Academics', 'Music', 'Sports', 'Digital Technologies'],
+    c:3, why:'Digital Technologies. No badges. No recognition. Nothing.' },
+  { q:'Is using two thirds of a lesson to learn how to answer one question in a game dev class efficient?',
+    a:['Yes \u2014 it is what makes a game successful', 'No \u2014 we should spend more time building and learning'],
+    c:0, why:'Yes. Because that is how school works.' },
+  { q:'Will you cook another person again?',
+    a:['Yes \u2014 bro why not', 'No \u2014 it is the wrong thing'],
+    c:1, why:'No. Good boy.' },
+  { q:'Will you assault a teacher again?',
+    a:['Yes \u2014 THEY\u2019RE FORCING ME TO LINE UP', 'No \u2014 I listen to them'],
+    c:1, why:'No. Goooood booooyyyyyy.' },
+  { q:'Will you do your homework?',
+    a:['Yes \u2014 it is fun lol', 'No \u2014 I would rather play westlakeboys.xyz'],
+    c:0, why:'Yes. Say it like you mean it.' }
+];
+const DET_PER_SIT = 4;
+function detShuffle(){
+  const o = DET_QS.map((_,i)=>i);
+  for (let i=o.length-1;i>0;i--){ const j=rint(0,i); const t=o[i]; o[i]=o[j]; o[j]=t; }
+  return o;
+}
+function detNextBatch(){
+  if (!G.detOrder || G.detAt >= G.detOrder.length){ G.detOrder = detShuffle(); G.detAt = 0; }
+  const batch = G.detOrder.slice(G.detAt, G.detAt + DET_PER_SIT);
+  G.detAt += batch.length;
+  return batch;
+}
+function detShow(){
+  const D = G.det;
+  const Q = DET_QS[D.batch[D.i]];
+  $('detSheet').classList.remove('hidden');
+  $('dqNum').textContent = (D.i+1) + ' of ' + D.batch.length;
+  $('dqScore').textContent = (D.right>0?'+':'') + D.right;
+  $('dqScore').className = D.right < 0 ? 'bad' : '';
+  $('dqQ').textContent = Q.q;
+  $('dqOpts').innerHTML = Q.a.map(function(t,i){
+    return '<div class="dqOpt" data-i="'+i+'"><u>'+(i+1)+'</u><span>'+t+'</span></div>'; }).join('');
+  $('dqMark').textContent = ''; $('dqMark').className = 'dqMark';
+  for (const el of $('dqOpts').children){
+    const idx = +el.dataset.i;
+    const go = function(ev){ ev.preventDefault(); ev.stopPropagation(); detAnswer(idx); };
+    el.addEventListener('click', go);
+    el.addEventListener('touchstart', go, {passive:false});
+  }
+}
+function detAnswer(n){
+  const D = G.det;
+  if (!D || D.locked || D.done) return;
+  const Q = DET_QS[D.batch[D.i]];
+  if (n < 0 || n >= Q.a.length) return;
+  D.locked = true;
+  const ok = (n === Q.c);
+  const opts = $('dqOpts').children;
+  opts[n].classList.add(ok ? 'right' : 'wrong');
+  if (!ok && opts[Q.c]) opts[Q.c].classList.add('right');
+  const m = $('dqMark');
+  m.textContent = (ok ? 'CORRECT \u2014 ' : 'WRONG \u2014 ') + Q.why;
+  m.className = 'dqMark ' + (ok ? 'right' : 'wrong');
+  if (ok){ D.right++; logAura('Got one right in detention', 1); Audio_.point(); }
+  else   { D.right--; logAura('Got one wrong in detention', -1); Audio_.bump(); }
+  $('dqScore').textContent = (D.right>0?'+':'') + D.right;
+  $('dqScore').className = D.right < 0 ? 'bad' : '';
+  D.until = performance.now() + 1900;
+}
+function detStep(){
+  const D = G.det;
+  if (!D || D.done || !D.until) return;
+  if (performance.now() < D.until) return;
+  D.until = 0; D.i++; D.locked = false;
+  if (D.i >= D.batch.length){
+    D.done = true;
+    $('detSheet').classList.add('hidden');
+    $('dqMark').textContent = '';
+    const f = $('detFoot');
+    if (f) f.textContent = 'Sheet done \u2014 ' + (D.right>0?'+':'') + D.right
+      + ' aura. Now wait for the door.';
+  } else detShow();
+}
+
 function sendToDetention(reason){
   if (G.inDetention || G.ejecting>0 || G.playerBoarded) return;
   G.playerBarred = true; G.detentions++;
@@ -6667,7 +6812,8 @@ function sendToDetention(reason){
 }
 function startDetention(){
   fadeTo(()=>{
-    G.inDetention = true; G.detention = 10.0;
+    G.inDetention = true; G.detention = 4.0;
+    G.det = { batch: detNextBatch(), i:0, right:0, locked:false, done:false, until:0 };
     const i = agents.indexOf(player); if (i>=0) agents.splice(i,1);
     detention.group.visible = true;
     detention.door.rotation.y = 0;
@@ -6675,6 +6821,8 @@ function startDetention(){
     pressure = 0; camShakeX = camShakeY = 0;
     $('detOver').classList.remove('hidden');
     $('detTimer').textContent = '10';
+    $('detSheet').classList.add('hidden');
+    detShow();
   });
 }
 function endDetention(){
@@ -6699,10 +6847,15 @@ function updatePunish(dt){
     if (G.ejecting <= 0){ G.ejecting = 0; startDetention(); }
   }
   if (G.inDetention){
-    G.detention -= dt;
-    const el = $('detTimer'); if (el) el.textContent = Math.max(0, Math.ceil(G.detention));
-    if (G.detention <= 1.1) detention.door.rotation.y = lerp(detention.door.rotation.y, -1.65, Math.min(1, dt*3.6));
-    if (G.detention <= 0) endDetention();
+    // the clock only starts once the sheet is finished
+    const D = G.det;
+    const free = !D || D.done;
+    if (free) G.detention -= dt;
+    const el = $('detTimer');
+    if (el) el.textContent = free ? Math.max(0, Math.ceil(G.detention)) : '\u2014';
+    if (free && G.detention <= 1.1)
+      detention.door.rotation.y = lerp(detention.door.rotation.y, -1.65, Math.min(1, dt*3.6));
+    if (free && G.detention <= 0) endDetention();
   }
 }
 function seatTier(rank){
@@ -6770,6 +6923,7 @@ const G = {
   teacher:null, lineUp:false, lineGrace:0, playerBarred:false, cookCharge:1,
   teacherBay:0, qcounter:0, isDouble:false, topDeck:false,
   ejecting:0, inDetention:false, detention:0, detentions:0,
+  det:null, detOrder:null, detAt:0,
   inLine:false, playerQPos:undefined, outOfLine:0, leaveHold:0, rejoinCD:0, everInLine:false,
   teacherAtBoard:false, aura:0, rideSkip:false, tier:null, ridePose:null,
   rideMode:false, rideS:0, rideA:0, rideDist:0, routeReady:false,
@@ -7005,7 +7159,10 @@ addEventListener('keydown', e=>{
   if (e.code==='KeyE') eEdge = true;
   if (e.code==='KeyQ') qEdge = true;
   if (/^Key[A-Z]$/.test(e.code) || e.code==='Space') edges[e.code] = (edges[e.code]||0)+1;
-  if (/^(Digit|Numpad)[1-4]$/.test(e.code) && !e.repeat) edges[e.code] = (edges[e.code]||0)+1;
+  if (/^(Digit|Numpad)[1-4]$/.test(e.code) && !e.repeat){
+    edges[e.code] = (edges[e.code]||0)+1;
+    if (G.det && !G.det.done) detAnswer(+e.code.slice(-1) - 1);
+  }
   if (e.code==='Space') spaceEdge++;
   if (e.code==='KeyE' && G.playerBoarded && G.started && G.mode==='bay' && G.phase!=='over'){
     G.rideSkip = true;
@@ -7031,10 +7188,6 @@ function skipClass(){
     Lunch.S.done = true;
     banner('SKIPPED.', 'Lunch — testing', 1400);
     finishLunch();
-  } else if (G.mode==='exam' && !ExamScene.S.done){
-    ExamScene.S.done = true;
-    banner('SKIPPED.', 'The Exam \u2014 testing', 1400);
-    finishExam();
   } else if (G.mode==='gda' && !GDAScene.S.done){
     GDAScene.S.done = true;
     banner('SKIPPED.', 'Game Dev — testing', 1400);
@@ -7959,7 +8112,7 @@ function updateHUD(){
 /* ============================================================
    12b.  THE FINALE  —  an extraordinary day gets called to the front
    ============================================================ */
-const FIN_GOOD = 150, FIN_BAD = 0;
+const FIN_GOOD = 150, FIN_BAD = 0;      // nothing to show for the day and you are on that stage
 const FIN = {
   kind:'good', total:0, t:0, step:-1, active:false,
   px:0, pz:HALL.ZF-1.6, vx:0, vz:0,
@@ -8246,6 +8399,7 @@ function loop(now){
     simulate(dt);
     updateBus(dt);
   }
+  if (G.det && !G.det.done) detStep();        // the detention sheet, whichever room you are in
   if (G.started && G.mode==='bay') updatePunish(dt);
   updateCamera(dt);
   updateSceneTitle();
@@ -8358,8 +8512,24 @@ function finishGDA(){
     $('hallHint').classList.add('hidden');
     $('jumpFx').classList.add('hidden');
     G.auraBank = carried + earned; G.auraGDA = earned;
-    startExam();
+    goToBay();
   });
+}
+/* the old exam chapter is gone; this is what used to be the tail of finishExam */
+function goToBay(){
+  if (ExamScene.group) ExamScene.group.visible = false;   // only built if the old exam ever ran
+  $('hallHud').classList.add('hidden');
+  $('hallCapWrap').classList.add('hidden');
+  $('hallCapWrap').classList.remove('hi');
+  $('keyCue').classList.remove('side');
+  $('hallHint').classList.add('hidden');
+  $('ui').style.display='';
+  $('vig').style.opacity = 0;
+  sun.intensity = 1.05; hemi.intensity = 0.75;
+  G.mode='bay';
+  resetGame();
+  showControlCue(CUE_SCRUM, true); clearInputEdges();
+  setSceneTitle('3:10pm');
 }
 function resetGame(){
   for (let i=agents.length-1;i>=0;i--) removeAgent(agents[i]);
@@ -8378,7 +8548,7 @@ function resetGame(){
   Ride.reset(0, BUS_Z, 0);
   scene.fog.near=120; scene.fog.far=460;
   fleet.forEach(b=>{ b.group.rotation.y=0; b.group.position.z=BUS_Z; });
-  G.ejecting=0; G.inDetention=false; G.detention=0; G.detentions=0;
+  G.ejecting=0; G.inDetention=false; G.detention=0; G.detentions=0; G.det=null;
   detention.group.visible=false; detention.door.rotation.y=0;
   $('detOver').classList.add('hidden'); $('fade').style.opacity=0;
   spawnCrowd(MAX_CROWD, [-21, 21]);
@@ -8818,6 +8988,7 @@ function tuiPress(act){
   if (act === 'KeyF'){ cookPressed = true; edges.KeyF = (edges.KeyF||0)+1; return; }
   if (act === 'KeyE'){ eEdge = true; edges.KeyE = (edges.KeyE||0)+1; tuiRideCheck(); return; }
   if (act === 'KeyQ'){ qEdge = true; edges.KeyQ = (edges.KeyQ||0)+1; return; }
+  if (act.slice(0,3) === 'det'){ detAnswer(+act.slice(3) - 1); return; }
   edges[act] = (edges[act]||0)+1;              // Key<letter> to stand or clap, Digit1-4 in the exam
 }
 function tuiRelease(act){ if (act === 'ctrl') bracing = false; }
@@ -8833,13 +9004,19 @@ function tuiRideCheck(){
 
 function tuiSpec(){
   if (!G.started) return [];
+  if (G.det && !G.det.done){
+    const D = G.det;
+    if (D.locked) return [];
+    return DET_QS[D.batch[D.i]].a.map(function(_,i){
+      return [String(i+1), 'det'+(i+1), 'big']; });
+  }
   if (G.mode === 'finale') return [['COOK','KeyF','big']];
   if (G.phase === 'over')  return [];
   if (G.mode === 'assembly'){
     const S = Hall.S;
     if (S.done) return [];
     const a = [];
-    if (S.phase === 'rush' && !Hall.P.seated) a.push(['SIT','KeyE']);
+    if (S.phase === 'rush' && !Hall.P.seated) a.push(['SIT','KeyE', S.nearSeat ? '' : 'dim']);
     a.push([S.standL + '~STAND', 'Key' + S.standL, 'secret']);
     a.push([S.clapL  + '~CLAP',  'Key' + S.clapL,  'secret']);
     if (S.phoneT > 0 && S.phoneMine) a.push(['QUIET','KeyQ']);
@@ -8859,8 +9036,8 @@ function tuiSpec(){
     if (ExamScene.S.done) return [];
     return [['1','Digit1','big'],['2','Digit2','big'],['3','Digit3','big'],['4','Digit4','big']];
   }
-  if (G.inDetention)   return [['E','KeyE','big']];
-  if (G.playerBoarded) return [['SCORE','KeyE']];
+  if (G.inDetention)   return [];
+  if (G.playerBoarded) return [['YOUR SCORE FOR THE DAY','KeyE','wide']];
   return [['COOK','KeyF'],['BRACE','ctrl'],['PUSH','Space']];
 }
 function tuiLabel(t){
@@ -8886,6 +9063,9 @@ function updateTouchUI(){
   TOUCH.sig = sig;
   const pad = $('tuiPad');
   $('tui').style.setProperty('--cols', spec.length > 3 ? 2 : Math.max(1, spec.length));
+  // the wide pill sets its own width rather than following the button grid
+  pad.style.width = spec.some(function(x){ return (x[2]||'').indexOf('wide') >= 0; })
+                  ? 'min(62vw,300px)' : '';
   pad.innerHTML = spec.map(function(it, i){
     return '<div class="tb' + (it[2] ? ' ' + it[2] : '') + '" data-i="' + i + '">'
          + '<span class="lab">' + tuiLabel(it[0]) + '</span></div>';
@@ -8925,6 +9105,9 @@ window.__BBB = { G, camera, buses, agents, scene, renderer, Audio_,
   LB, lbOn, lbClean, lbFetch, lbSubmit, lbOpen, lbClose, lbSend, lbRender, lbMine(){ return lbMine(); },
   lbCount, lbPlacing, lbFinish,
   TOUCH, tuiSpec, updateTouchUI, tuiPress,
+  sendToDetention, startDetention, detAnswer, DET_QS, goToBay,
+  AURA_LOG,
+  FIN_GOOD, FIN_BAD,
   lunchKiosk, tuiHitKiosk, LUN, Lunch,
   boardTexture, BOARD_CREDITS, BOARD_PREFECTS, BOARD_SUPPORTERS, Hall,
   get playerName(){ return PLAYER_NAME; }, setPlayerName(n){ PLAYER_NAME = n; },
