@@ -219,6 +219,113 @@
     text-shadow:0 0 24px rgba(0,0,0,.95), 0 4px 18px rgba(0,0,0,.95); }
   #sleepCue span { display:block; margin-top:6px; font-size:15px; font-weight:800; letter-spacing:1.6px;
     color:#fff; text-shadow:0 2px 12px rgba(0,0,0,.95); }
+  .rBtns { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  button.ghost { background:transparent; color:#9fd8b6; border:1px solid rgba(47,174,99,.5); }
+  button.ghost:hover { background:rgba(47,174,99,.14); color:#eaf7ef; }
+  #lbCard { width:min(560px,94vw); }
+  #lbCard h1 { font-size:32px; margin-bottom:12px; }
+  .lbYou { font-size:14px; color:#a9c6b6; margin-bottom:10px; }
+  .lbYou b { color:#3ddc84; font-size:19px; }
+  .lbEntry { display:flex; gap:8px; }
+  #lbName, #startNameInput { flex:1; min-width:0; font:inherit; font-size:17px; font-weight:700; letter-spacing:.5px;
+    padding:11px 13px; border-radius:11px; color:#eaf7ef; background:rgba(255,255,255,.06);
+    border:1px solid rgba(47,174,99,.45); outline:none; pointer-events:auto; }
+  #lbName:focus, #startNameInput:focus { border-color:#3ddc84; background:rgba(47,174,99,.12); }
+  #lbName::placeholder, #startNameInput::placeholder { color:#6d8b7b; font-weight:600; }
+
+  /* ---- name box on the start screen ---- */
+  #startName { margin:16px 0 14px; }
+  #startName label { display:block; margin-bottom:7px; font-size:11.5px; font-weight:800;
+    letter-spacing:2.4px; text-transform:uppercase; color:#7f9c8b; }
+  #startName .lbEntry { display:block; }
+  #startNameInput { width:100%; box-sizing:border-box; }
+  #startName.shake { animation:nameShake .34s ease; }
+  @keyframes nameShake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-7px)}
+    45%{transform:translateX(6px)} 70%{transform:translateX(-3px)} }
+
+  /* ---- where you placed, on the score card ---- */
+  #rPlace { display:flex; align-items:center; gap:13px; margin:14px 0 4px; padding:12px 15px;
+    border-radius:13px; background:rgba(47,174,99,.12); border:1px solid rgba(47,174,99,.32); }
+  #rPlace u { flex:0 0 auto; font-style:normal; text-decoration:none; font-size:30px; font-weight:900;
+    line-height:1; color:#3ddc84; }
+  #rPlace span { font-size:13px; font-weight:700; letter-spacing:.5px; color:#a9c6b6; line-height:1.35; }
+  #rPlace.g { background:rgba(255,210,63,.15); border-color:rgba(255,210,63,.45); }
+  #rPlace.g u { color:#ffd23f; text-shadow:0 0 22px rgba(255,210,63,.5); }
+  #rPlace.s { background:rgba(216,226,230,.10); border-color:rgba(216,226,230,.34); }
+  #rPlace.s u { color:#d8e2e6; }
+  #rPlace.b { background:rgba(208,146,87,.12); border-color:rgba(208,146,87,.38); }
+  #rPlace.b u { color:#d09257; }
+  #rPlace.bad { background:rgba(255,106,90,.10); border-color:rgba(255,106,90,.30); }
+  #rPlace.bad u { color:#ff6a5a; font-size:22px; }
+  .lbMsg { min-height:17px; margin-top:7px; font-size:12.5px; font-weight:700; letter-spacing:.4px; color:#a9c6b6; }
+  .lbMsg.bad { color:#ff6a5a; }
+  .lbMsg.good { color:#3ddc84; }
+  #lbList { margin:14px 0 16px; max-height:46vh; overflow:auto; border-radius:12px;
+    background:rgba(0,0,0,.28); padding:6px 4px; }
+  .lbRow { display:flex; align-items:center; gap:10px; padding:6px 10px; font-size:14px; border-radius:8px; }
+  .lbRow u { flex:0 0 30px; text-align:right; font-style:normal; text-decoration:none;
+    color:#6d8b7b; font-weight:800; font-size:12px; }
+  .lbRow u.g { color:#ffd23f; } .lbRow u.s { color:#d8e2e6; } .lbRow u.b { color:#d09257; }
+  .lbRow i { flex:1; font-style:normal; color:#eaf7ef; font-weight:700; overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap; }
+  .lbRow em { font-style:normal; font-size:10.5px; letter-spacing:1.2px; color:#7f9c8b; text-transform:uppercase; }
+  .lbRow b { flex:0 0 62px; text-align:right; color:#3ddc84; font-weight:800; }
+  .lbRow.me { background:rgba(47,174,99,.20); outline:1px solid rgba(47,174,99,.5); }
+  .lbNote { padding:22px 14px; text-align:center; font-size:13.5px; color:#9fb8a8; line-height:1.6; }
+  .lbNote small { color:#6d8b7b; }
+  /* ================= touch controls ================= */
+  body.touch canvas, body.touch #tui { touch-action:none; }
+  body.touch #keys { display:none; }
+  body.touch #keyCue { display:none !important; }
+  body.touch #hallSit { font-size:14px; }
+
+  #tui { position:fixed; inset:0; z-index:14; pointer-events:none;
+    -webkit-user-select:none; user-select:none; }
+  #tuiStick { position:absolute; width:136px; height:136px; margin:-68px 0 0 -68px;
+    border-radius:50%; border:2px solid rgba(255,255,255,.26);
+    background:radial-gradient(circle at 50% 50%, rgba(12,20,34,.34), rgba(12,20,34,.10) 70%); }
+  #tuiStick i { position:absolute; left:50%; top:50%; width:60px; height:60px; margin:-30px 0 0 -30px;
+    border-radius:50%; background:rgba(255,210,63,.50); border:2px solid rgba(255,255,255,.55);
+    box-shadow:0 4px 18px rgba(0,0,0,.5); }
+  #tuiStick.run i { background:rgba(61,220,132,.62); border-color:#3ddc84; }
+  #tui { --tb:76px; --tgap:11px; }
+  #tuiPad { position:absolute; right:18px; bottom:26px; display:flex; flex-wrap:wrap;
+    justify-content:flex-end; align-content:flex-end; gap:var(--tgap);
+    width:calc(var(--cols,3) * var(--tb) + (var(--cols,3) - 1) * var(--tgap));
+    pointer-events:auto; }
+  #tuiPad .tb { width:var(--tb); height:var(--tb); border-radius:50%; display:flex; align-items:center;
+    flex-direction:column; justify-content:center; text-align:center; line-height:1.05;
+    font-size:13px; font-weight:900; letter-spacing:1px; color:#ffd23f;
+    background:rgba(12,18,30,.52); border:2px solid rgba(255,255,255,.36);
+    text-shadow:0 2px 8px rgba(0,0,0,.9); box-shadow:0 6px 20px rgba(0,0,0,.4);
+    -webkit-tap-highlight-color:transparent; }
+  #tuiPad .tb.big { font-size:21px; letter-spacing:0; }
+  #tuiPad .tb small { display:block; font-size:9px; letter-spacing:1.4px; opacity:.85; margin-top:2px; }
+  #tuiPad .tb.on { background:rgba(255,210,63,.34); border-color:#ffd23f; color:#fff; transform:scale(.94); }
+  #tuiHint { position:absolute; left:16px; bottom:22px; width:40vw; font-size:10px; font-weight:800;
+    letter-spacing:1.4px; line-height:1.5; color:rgba(255,255,255,.38); text-shadow:0 2px 8px #000; }
+  #tuiRotate { position:fixed; inset:0; z-index:55; display:none; align-items:center;
+    justify-content:center; text-align:center; background:rgba(4,10,7,.96); padding:30px; }
+  body.touch #tuiRotate.armed { display:flex; }
+  #tuiRotate b { display:block; font-size:26px; font-weight:900; letter-spacing:3px; color:#3ddc84; }
+  #tuiRotate span { display:block; margin-top:12px; font-size:13px; letter-spacing:1.5px;
+    color:#a9c6b6; line-height:1.6; }
+  @media (orientation:landscape){ body.touch #tuiRotate.armed { display:none; } }
+
+  @media (max-width:720px){
+    .card { padding:20px 18px !important; }
+    #startOver h1, #resultOver h1 { font-size:clamp(26px,8vw,44px); }
+    #bigKeys { display:none; }
+    #tui { --tb:66px; --tgap:9px; }
+    #tuiPad .tb { font-size:11.5px; }
+  }
+  @media (max-height:520px){
+    #tui { --tb:62px; --tgap:9px; }
+    #tuiPad .tb { font-size:11px; }
+    #tuiStick { width:112px; height:112px; margin:-56px 0 0 -56px; }
+    #tuiStick i { width:50px; height:50px; margin:-25px 0 0 -25px; }
+  }
+
   #cookedOver { position:fixed; inset:0; z-index:42; display:flex; align-items:center;
     justify-content:center; pointer-events:none; background:rgba(0,0,0,.28); }
   #cookedOver span { font-size:clamp(56px,15vw,190px); font-weight:900; letter-spacing:14px;
@@ -267,7 +374,7 @@
 </style>
 </head>
 <body>
-<div id="loadNote">Taking the bus to school...</div>
+<div id="loadNote">MONDAY MORNING...</div>
 
 <div id="ui">
   <div id="hudLeft" class="panel">
@@ -317,6 +424,12 @@
 <div id="drowse"></div>
 <div id="sleepCue" class="hidden"><b>WAKE UP</b><span>Look at a word &middot; click to shake it off</span></div>
 <div id="keyCue" class="hidden"></div>
+<div id="tui" class="hidden">
+  <div id="tuiStick" class="hidden"><i></i></div>
+  <div id="tuiHint" class="hidden">DRAG LEFT TO MOVE &middot; RIGHT TO LOOK</div>
+  <div id="tuiPad"></div>
+</div>
+<div id="tuiRotate"><div><b>TURN YOUR PHONE</b><span>westlakeboys.xyz plays sideways.<br>Rotate to landscape to start the day.</span></div></div>
 <div id="sceneTitle" class="hidden"></div>
 <div id="jumpFx" class="hidden">
   <div id="jumpBig">&minus;10 AURA</div>
@@ -355,7 +468,16 @@
       <div class="bk"><b>CTRL</b><span>BRACE</span></div>
       <div class="bk"><b>F</b><span>COOK &mdash; once per game</span></div>
     </div>
-    <button id="startBtn">FIRST BELL</button>
+    <div id="startName">
+      <label for="startNameInput">Name for the leaderboard</label>
+      <input id="startNameInput" maxlength="14" autocomplete="off" spellcheck="false"
+             placeholder="what the school calls you">
+      <div id="startNameMsg" class="lbMsg"></div>
+    </div>
+    <div class="rBtns">
+      <button id="startBtn">FIRST BELL</button>
+      <button id="startBoardBtn" class="ghost">LEADERBOARD</button>
+    </div>
   </div>
 </div>
 
@@ -363,11 +485,32 @@
   <div class="card" id="resultCard">
     <div class="tag">Your day &middot; graded</div>
     <h1 id="rGrade" class="grade gAch">Achieved</h1>
+    <div id="rPlace" class="hidden"><u id="rPlaceNum">#?</u><span id="rPlaceSub"></span></div>
     <div id="auraBox">
       <div class="auraTop"><span>AURA</span><b id="rAura">0</b></div>
       <div id="auraList"></div>
     </div>
-    <button id="againBtn">RUN IT BACK</button>
+    <div class="rBtns">
+      <button id="boardBtn" class="ghost">LEADERBOARD</button>
+      <button id="againBtn">RUN IT BACK</button>
+    </div>
+  </div>
+</div>
+
+<div id="lbOver" class="over hidden">
+  <div class="card" id="lbCard">
+    <div class="tag">westlakeboys.xyz &middot; the board</div>
+    <h1>TOP <em>AURA</em></h1>
+    <div id="lbForm" class="hidden">
+      <div class="lbYou">You scored <b id="lbMyAura">0</b> &middot; <span id="lbMyGrade">Achieved</span></div>
+      <div class="lbEntry">
+        <input id="lbName" maxlength="14" autocomplete="off" spellcheck="false" placeholder="your name">
+        <button id="lbGo">PUT ME ON IT</button>
+      </div>
+      <div id="lbMsg" class="lbMsg"></div>
+    </div>
+    <div id="lbList"></div>
+    <button id="lbBack">BACK</button>
   </div>
 </div>
 
@@ -2188,39 +2331,90 @@ function honoursName(){
   if (Math.random() < 0.30) ini += String.fromCharCode(65+rint(0,25)) + '.';
   return ini + ' ' + sur;
 }
-function honoursTexture(title, n){
-  const c=document.createElement('canvas'); c.width=320; c.height=1100;
-  const g=c.getContext('2d');
+/* ---- the boards down the side walls of the hall ----
+   Most of them are bare timber and a crest.  Three of them, on the
+   right-hand wall as the school looks at the stage, actually say
+   something, and those are set in big white letters you can read
+   from your seat.                                                     */
+const BOARD_CREDITS = { title:'CREDITS',
+  rows:[ {n:'ALEX LIANG'}, {n:'CLAUDE'} ],
+  note:'LOL they made it in three afternoons.' };
+const BOARD_PREFECTS = { title:'SENIOR PREFECTS', rows:[
+  { r:'HEAD BOY',         n:'HARPER WILSON' },
+  { r:'DEPUTY HEAD BOY',  n:'NATHAN DAVIES' },
+  { r:'DEPUTY HEAD BOY',  n:'JAYDEN WHITEHEAD' },
+  { r:'CULTURAL CAPTAIN', n:'PHOENIX NAERA' },
+  { r:'SPORTS CAPTAIN',   n:'SAM BIRD' },
+  { r:'ACADEMIC CAPTAIN', n:'MATTHEW HENG' },
+  { r:'MUSIC CAPTAIN',    n:'HUGH REID' },
+  { r:'SERVICE CAPTAIN',  n:'VINAY VARADARAJAN' } ] };
+const BOARD_SUPPORTERS = { title:'SUPPORTERS',
+  rows:[ {n:'BEVIS JIANG'}, {n:'MIN-SEO BANG'} ] };
+
+function fitFont(g, txt, maxW, px, weight, fam){
+  for (let sz = px; sz > 8; sz -= 1){
+    g.font = weight + ' ' + sz + 'px ' + fam;
+    if (g.measureText(txt).width <= maxW) return sz;
+  }
+  return 9;
+}
+function boardTexture(spec){
+  const W = 512, H = 1760;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
   // the timber
-  g.fillStyle='#a8763d'; g.fillRect(0,0,320,1100);
-  for (let i=0;i<190;i++){
+  g.fillStyle = '#a8763d'; g.fillRect(0, 0, W, H);
+  for (let i = 0; i < 240; i++){
     g.globalAlpha = 0.05 + Math.random()*0.10;
-    g.fillStyle = Math.random()<0.5 ? '#8d5f2c' : '#c08e52';
-    g.fillRect(Math.random()*320, 0, 1 + Math.random()*3, 1100);
+    g.fillStyle = Math.random() < 0.5 ? '#8d5f2c' : '#c08e52';
+    g.fillRect(Math.random()*W, 0, 1 + Math.random()*5, H);
   }
   g.globalAlpha = 1;
-  g.fillStyle='#6f4a20'; g.fillRect(0,0,320,7); g.fillRect(0,1093,320,7);
-  g.fillRect(0,0,6,1100); g.fillRect(314,0,6,1100);
-  // crest and title, in gilt
-  drawCrest(g, 160, 92, 118);
-  spacedCaps(g, title, 160, 196, title.length > 17 ? 15 : 19, 2.2, '#f3e6cb', '700');
-  g.strokeStyle='#e2cfa6'; g.lineWidth=2;
-  g.beginPath(); g.moveTo(46,214); g.lineTo(274,214); g.stroke();
-  // the roll itself — nobody's name goes on the same board twice
-  const first = 2025 - (n-1), used = {};
-  for (let i=0;i<n;i++){
-    const y = 244 + i*18;
-    if (y > 1078) break;
-    g.fillStyle='#efe0c2';
-    g.font='500 12px Georgia, serif'; g.textAlign='left';
-    g.fillText(String(first+i), 34, y);
-    g.font='500 12.5px Georgia, serif'; g.textAlign='right';
-    let nm = honoursName(), guard = 0;
-    while (used[nm] && guard++ < 40) nm = honoursName();
-    used[nm] = 1;
-    g.fillText(nm, 288, y);
+  g.fillStyle = '#6f4a20';
+  g.fillRect(0, 0, W, 11); g.fillRect(0, H-11, W, 11);
+  g.fillRect(0, 0, 10, H); g.fillRect(W-10, 0, 10, H);
+  drawCrest(g, W/2, 168, 200);
+  if (!spec) return new THREE.CanvasTexture(c);     // a bare board
+
+  const M = 40, IN = W - M*2;
+  const tPx = fitFont(g, spec.title, IN - 40, 40, '800', 'Georgia, "Times New Roman", serif');
+  spacedCaps(g, spec.title, W/2, 350, tPx, 2.6, '#ffffff', '800');
+  g.strokeStyle = '#f0e4c8'; g.lineWidth = 3;
+  g.beginPath(); g.moveTo(M+18, 378); g.lineTo(W-M-18, 378); g.stroke();
+
+  const withRoles = spec.rows.some(r => r.r);
+  const bottom = spec.note ? 1520 : 1660;
+  const top = withRoles ? 452 : 560;
+  const step = Math.min(withRoles ? 168 : 150, (bottom - top) / spec.rows.length);
+  // a short roll sits in the middle of the board rather than crowding the top
+  const y0 = withRoles ? top : (top + bottom)/2 - (spec.rows.length-1)*step/2;
+  g.textAlign = 'center';
+  spec.rows.forEach(function(row, i){
+    const y = y0 + i*step;
+    if (row.r){
+      const rp = fitFont(g, row.r, IN, 21, '700', 'Georgia, serif');
+      spacedCaps(g, row.r, W/2, y, rp, 1.8, '#e9d6ac', '700');
+    }
+    const np = fitFont(g, row.n, IN, withRoles ? 42 : 52, '800', 'Georgia, serif');
+    g.font = '800 ' + np + 'px Georgia, serif';
+    g.fillStyle = '#ffffff';
+    g.textAlign = 'center';
+    g.fillText(row.n, W/2, y + (row.r ? 50 : 0));
+  });
+  if (spec.note){
+    g.fillStyle = '#ffffff';
+    g.textAlign = 'center';
+    const words = spec.note.split(' ');
+    let line = '', y = 1580;
+    g.font = 'italic 600 30px Georgia, serif';
+    for (const w of words){
+      const t = line ? line + ' ' + w : w;
+      if (g.measureText(t).width > IN){ g.fillText(line, W/2, y); y += 38; line = w; }
+      else line = t;
+    }
+    if (line) g.fillText(line, W/2, y);
   }
-  g.textAlign='left';
+  g.textAlign = 'left';
   return new THREE.CanvasTexture(c);
 }
 
@@ -2553,6 +2747,9 @@ const HEAD_OPENERS = [
   'Ties are to be worn at the neck. Not in the pocket. Not on the wrist.',
   'Somebody has been reversing the clocks in D block. It is not funny. It is quite clever.'
 ];
+// this one is read out every assembly, whatever else he finds to complain about
+const HEAD_SUPPORTERS_LINE =
+  'Look to the boards on your right \u2014 our supporters. Repost alexlbuilds\u2019 post to get on the wall!';
 const HEAD_ACHIEVEMENTS = [
   { solo:false, text:'won the North Harbour football champs' },
   { solo:true,  text:'won the North Island championship for saying \u201csix seven\u201d the most times in sixty seconds. He did it sixty-seven times' },
@@ -2682,16 +2879,18 @@ const Hall = (function(){
       new THREE.MeshBasicMaterial({map:crestTexture(), transparent:true}));
     cr.position.set(0, HALL.H-1.30, HALL.ZF+0.20); group.add(cr);
     // honours boards down BOTH side walls, starting up by the stage
-    const titles=[
-      ['HEAD BOY','DUX','SPORTSMAN OF THE YEAR','ACADEMIC CAPTAIN','HOUSE CAPTAINS'],
-      ['DEPUTY HEAD BOY','PROXIME ACCESSIT','SPORTS CAPTAIN','MUSIC / CULTURAL CAPTAIN','LONG SERVING STAFF']
+    // side 1 is +X: the right-hand wall as the school looks at the stage,
+    // and index 0 is the board nearest the stage
+    const boards = [
+      [ null, null, null, null, null ],
+      [ BOARD_CREDITS, BOARD_PREFECTS, BOARD_SUPPORTERS, null, null ]
     ];
     for (let side=0; side<2; side++){
       const sx = side ? 1 : -1;
-      titles[side].forEach((t,i)=>{
-        const m = new THREE.Mesh(new THREE.PlaneGeometry(1.10,3.60),
-          new THREE.MeshLambertMaterial({map:honoursTexture(t, 46), side:THREE.DoubleSide}));
-        m.position.set(sx*(HALL.W-0.32), 3.75, HALL.ZF + 2.1 + i*3.35);
+      boards[side].forEach((spec,i)=>{
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(1.62,4.24),
+          new THREE.MeshLambertMaterial({map:boardTexture(spec), side:THREE.DoubleSide}));
+        m.position.set(sx*(HALL.W-0.32), 4.05, HALL.ZF + 2.4 + i*4.05);
         m.rotation.y = sx>0 ? -Math.PI/2 : Math.PI/2;
         group.add(m);
       });
@@ -2706,7 +2905,7 @@ const Hall = (function(){
         g.fillRect(-rand(10,60),-rand(4,20),rand(20,120),rand(8,40)); g.restore(); }
       const m=new THREE.Mesh(new THREE.PlaneGeometry(2.0,1.5),
         new THREE.MeshLambertMaterial({map:new THREE.CanvasTexture(c), side:THREE.DoubleSide}));
-      m.position.set(sx*(HALL.W-0.30), 4.2, HALL.ZF+19.4);
+      m.position.set(sx*(HALL.W-0.30), 4.2, HALL.ZF+21.6);
       m.rotation.y = sx>0 ? -Math.PI/2 : Math.PI/2;
       group.add(m);
     }
@@ -2880,7 +3079,8 @@ const Hall = (function(){
     S.standKey = 'Key'+S.standL; S.clapKey = 'Key'+S.clapL;
     S.sleepRound = rint(0,2);
     S.noticeOrder = NOTICES.map((_,i)=>i).sort(()=>Math.random()-0.5).slice(0,5);
-    S.openers = HEAD_OPENERS.slice().sort(()=>Math.random()-0.5).slice(0,3);
+    S.openers = HEAD_OPENERS.slice().sort(()=>Math.random()-0.5).slice(0,2);
+    S.openers.splice(rint(0, S.openers.length), 0, HEAD_SUPPORTERS_LINE);
     S.achv    = HEAD_ACHIEVEMENTS.slice().sort(()=>Math.random()-0.5).slice(0,2);
     S.closer  = pick(HEAD_CLOSERS);
     S.names1  = pickNames(4, null);
@@ -3249,8 +3449,9 @@ function updateHall(dt){
     if (keys['KeyS']||keys['ArrowDown']) { mx-=fx; mz-=fz; }
     if (keys['KeyD']||keys['ArrowRight']){ mx+=rx; mz+=rz; }
     if (keys['KeyA']||keys['ArrowLeft']) { mx-=rx; mz-=rz; }
+    if (TOUCH.mv){ mx += fx*TOUCH.mv.y + rx*TOUCH.mv.x; mz += fz*TOUCH.mv.y + rz*TOUCH.mv.x; }
     const ml=Math.hypot(mx,mz);
-    const run=(keys['ShiftLeft']||keys['ShiftRight']);
+    const run=(keys['ShiftLeft']||keys['ShiftRight']||TOUCH.run);
     const spd = run?5.0:3.5;
     if (ml>0.01){ P.vx += ((mx/ml)*spd-P.vx)*16*dt; P.vz += ((mz/ml)*spd-P.vz)*16*dt; }
     else { P.vx*=Math.max(0,1-9*dt); P.vz*=Math.max(0,1-9*dt); }
@@ -4545,16 +4746,16 @@ function examAnswer(n){
   const right = !!Q.both || i === ci;
   S.flash = Q.why ? 2.5 : 1.7; S.flashI = i;
   S.answered++;
-  S.aura += 3; logAura('Wrote something in a box', 3);
   Audio_.pen();
   S.reveal = { chosen:i, correct: Q.both ? i : ci, right,
                why: Q.why || (right ? (Q.note||'') : ('The marked answer was ' + (ci+1) + '. ' + (Q.note||''))) };
   if (right){
-    S.right++; S.aura += 5; S.goldHits++;
-    logAura(Q.why ? ('Marked correct \u2014 ' + Q.s.toLowerCase()) : Q.note, 5);
+    S.right++; S.aura += 1; S.goldHits++;
+    logAura('Got one right in the exam', 1);
     setTimeout(()=>Audio_.point(), 90);
     banner('CORRECT.', S.reveal.why, 3200);
   } else {
+    S.aura -= 1; logAura('Got one wrong in the exam', -1);
     setTimeout(()=>Audio_.grunt(), 90);
     banner('INCORRECT.', S.reveal.why, 3200);
   }
@@ -4616,7 +4817,7 @@ function updateExam(dt){
     S.readLeft = EXAM_READ_END - S.t;
     if (press){
       S.nagT = 1.4;
-      if (S.nags < 3){ S.nags++; S.aura -= 2; logAura('Picked up your pen in reading time', -2); }
+      if (S.nags < 3){ S.nags++; S.aura -= 1; logAura('Picked up your pen in reading time', -1); }
       Audio_.whistle();
       banner(EXAM_NAG[Math.min(S.nags-1,2)] || 'PENS DOWN.',
              S.nags>=3 ? 'He has stopped writing your name down. He has memorised it.'
@@ -4628,17 +4829,23 @@ function updateExam(dt){
     }
   }
   else if (S.stage === 'writing'){
-    if (press) examAnswer(press);
+    // once it is written down it is written down — no changing your mind when
+    // the marker shows you the answer
+    if (press && S.flash <= 0 && !S.reveal) examAnswer(press);
     if (S.flash > 0){
       S.flash -= dt;
       if (S.flash <= 0){
         S.flashI = -1; S.reveal = null;
         if (S.qi < examTotal(S)-1) S.qi++;
         else {
-          S.stage = 'done'; S.aura += 15; S.blanks = 0;
+          S.stage = 'done'; S.blanks = 0;
           S.t = Math.max(S.t, EXAM_OVER - 6.5);      // no sitting there for half a minute
-          logAura('Answered every single question', 15);
-          banner('YOU FINISHED THE PAPER.', 'Nobody finishes the paper. Sit back down.', 4000);
+          if (S.right > examTotal(S)/2){
+            S.aura += 5; logAura('Finished the paper, and got most of it right', 5);
+            banner('YOU FINISHED THE PAPER.', 'Nobody finishes the paper. Sit back down.', 4000);
+          } else {
+            banner('YOU FINISHED THE PAPER.', 'You got ' + S.right + ' of them right. Sit back down.', 4000);
+          }
         }
       }
     }
@@ -4653,7 +4860,7 @@ function updateExam(dt){
   }
   else if (S.stage === 'done'){
     if (press && S.breaches < 2){
-      S.breaches++; S.aura -= 4; logAura('Still writing after pens down', -4);
+      S.breaches++; S.aura -= 2; logAura('Still writing after pens down', -2);
       Audio_.whistle();
       banner('PENS. DOWN.', 'He is walking over. He has the clipboard out.', 2600);
     }
@@ -4735,14 +4942,11 @@ function startExam(){
 function finishExam(){
   const S = ExamScene.S;
   S.blanks = EXAM_QS.length - S.answered;
-  if (S.right >= 5){ S.aura += 6; logAura('Five marked correct', 6); }
   if (S.answered === 0){
-    S.aura -= 10; logAura('Handed in a completely blank paper', -10);
-  } else if (S.answered >= 10){
-    S.aura += 8; logAura('Attempted double figures', 8);
+    S.aura -= 3; logAura('Handed in a completely blank paper', -3);
   }
   if (S.finished >= 5 && S.answered < 6)
-    logAura('Watched the room empty around you', -3), S.aura -= 3;
+    logAura('Watched the room empty around you', -1), S.aura -= 1;
   const earned = Math.round(S.aura);
   const carried = G.auraBank || 0;
   fadeTo(()=>{
@@ -5604,15 +5808,16 @@ function updateLunch(dt){
     if (keys['KeyS']||keys['ArrowDown'])  { mx-=fx; mz-=fz; }
     if (keys['KeyD']||keys['ArrowRight']) { mx+=rx; mz+=rz; }
     if (keys['KeyA']||keys['ArrowLeft'])  { mx-=rx; mz-=rz; }
+    if (TOUCH.mv){ mx += fx*TOUCH.mv.y + rx*TOUCH.mv.x; mz += fz*TOUCH.mv.y + rz*TOUCH.mv.x; }
     const ml=Math.hypot(mx,mz);
     const brace = bracing || keys['ControlLeft'] || keys['ControlRight'];
-    const run = (keys['ShiftLeft']||keys['ShiftRight']) && stamina>8 && !brace;
+    const run = (keys['ShiftLeft']||keys['ShiftRight']||TOUCH.run) && stamina>8 && !brace;
     P.mass  = brace ? 3.6 : 1.0;
     P.speed = brace ? 0.85 : (run ? 4.55 : 2.95);
 
     const queued = S.lineUp && S.inLine && !S.barred;
     if (queued){
-      if (keys['KeyS']||keys['ArrowDown']){ S.leaveHold += dt;
+      if (keys['KeyS']||keys['ArrowDown']||TOUCH.back){ S.leaveHold += dt;
         if (S.leaveHold>0.55){ S.inLine=false; P.qrank=S.qcounter++; S.leaveHold=0;
           S.rejoinCD = 1.1;
           banner('OUT OF THE LINE.', 'Back of the queue for you', 2400); } }
@@ -6678,6 +6883,8 @@ function showResult(){
   $('rGrade').textContent = g.name;
   $('rGrade').className = 'grade ' + g.cls;
   $('resultOver').classList.remove('hidden');
+  // the card is already on screen; the board work happens behind it
+  if (lbOn()) lbFinish();
 }
 function endGame(){
   G.phase='over';
@@ -6701,7 +6908,7 @@ addEventListener('keydown', e=>{
   if (e.code==='KeyE') eEdge = true;
   if (e.code==='KeyQ') qEdge = true;
   if (/^Key[A-Z]$/.test(e.code) || e.code==='Space') edges[e.code] = (edges[e.code]||0)+1;
-  if (/^(Digit|Numpad)[1-4]$/.test(e.code)) edges[e.code] = (edges[e.code]||0)+1;
+  if (/^(Digit|Numpad)[1-4]$/.test(e.code) && !e.repeat) edges[e.code] = (edges[e.code]||0)+1;
   if (e.code==='Space') spaceEdge++;
   if (e.code==='KeyE' && G.playerBoarded && G.started && G.mode==='bay' && G.phase!=='over'){
     G.rideSkip = true;
@@ -6739,7 +6946,8 @@ function skipClass(){
 }
 addEventListener('keyup', e=>{ keys[e.code]=false; });
 renderer.domElement.addEventListener('mousedown', e=>{
-  if (!locked){ renderer.domElement.requestPointerLock(); return; }
+  if (TOUCH.on) return;                       // phones drive this through the touch layer
+  if (!locked){ lockPointer(); return; }
   if (e.button===0){ shovePressed=true; clickEdge=true; }
   if (e.button===2) bracing=true;
 });
@@ -6916,16 +7124,17 @@ function simulate(dt){
     if (keys['KeyS']||keys['ArrowDown'])  { mx-=fx; mz-=fz; }
     if (keys['KeyD']||keys['ArrowRight']) { mx+=rx; mz+=rz; }
     if (keys['KeyA']||keys['ArrowLeft'])  { mx-=rx; mz-=rz; }
+    if (TOUCH.mv){ mx += fx*TOUCH.mv.y + rx*TOUCH.mv.x; mz += fz*TOUCH.mv.y + rz*TOUCH.mv.x; }
     const ml=Math.hypot(mx,mz);
     const brace = bracing || keys['ControlLeft'] || keys['ControlRight'];
-    const run = (keys['ShiftLeft']||keys['ShiftRight']) && stamina>8 && !brace;
+    const run = (keys['ShiftLeft']||keys['ShiftRight']||TOUCH.run) && stamina>8 && !brace;
     player.mass = brace ? 3.6 : 1.0;
     player.speed = brace ? 0.85 : (run ? 4.55 : 2.95);
 
     const queued = G.lineUp && G.inLine && !G.playerBarred;
     if (queued){
       // hold S for a moment to step out and give up your place
-      if (keys['KeyS']||keys['ArrowDown']){ G.leaveHold += dt;
+      if (keys['KeyS']||keys['ArrowDown']||TOUCH.back){ G.leaveHold += dt;
         if (G.leaveHold > 0.55){ G.inLine=false; player.qrank = G.qcounter++; G.leaveHold=0;
           G.rejoinCD = 1.1;
           banner('OUT OF THE LINE.', 'Back of the queue for you', 2400); } }
@@ -7323,8 +7532,8 @@ function updateCamera(dt){
     return;
   }
   if (G.mode==='finale'){
-    camera.position.set(FIN.px, HALL_Y + HALL.STAGE_Y + 1.62, FIN.pz);
-    camera.rotation.set(pitch + camShakeY, yaw + camShakeX, 0, 'YXZ');
+    camera.position.set(FIN.px, HALL_Y + (FIN.fly ? FIN.py : HALL.STAGE_Y + 1.62), FIN.pz);
+    camera.rotation.set(pitch + camShakeY, yaw + camShakeX, FIN.roll || 0, 'YXZ');
     if (skyDome) skyDome.position.set(camera.position.x, HALL_Y, camera.position.z);
     sun.position.set(camera.position.x-20, HALL_Y+34, camera.position.z-20);
     sun.target.position.set(camera.position.x, HALL_Y, camera.position.z);
@@ -7614,7 +7823,7 @@ function updateHUD(){
   $('stamFill').style.width = stamina+'%';
   $('kShove').className = shoveAnim>0.4?'on':'';
   $('kBrace').className = (bracing||keys['ControlLeft']||keys['ControlRight'])?'on':'';
-  $('kRun').className = (keys['ShiftLeft']||keys['ShiftRight'])?'on':'';
+  $('kRun').className = (keys['ShiftLeft']||keys['ShiftRight']||TOUCH.run)?'on':'';
   $('kCook').className = G.cookCharge>0 ? 'ready' : 'spent';
   $('kCook').textContent = G.cookCharge>0 ? 'F — COOK (1)' : 'F — COOK (used)';
   $('vig').style.opacity = (G.playerBoarded||G.inDetention) ? 0 : Math.min(0.6, pressure*0.55);
@@ -7652,7 +7861,7 @@ function updateHUD(){
 /* ============================================================
    12b.  THE FINALE  —  an extraordinary day gets called to the front
    ============================================================ */
-const FIN_GOOD = 150, FIN_BAD = -100;
+const FIN_GOOD = 150, FIN_BAD = 0;
 const FIN = {
   kind:'good', total:0, t:0, step:-1, active:false,
   px:0, pz:HALL.ZF-1.6, vx:0, vz:0,
@@ -7693,7 +7902,7 @@ function finScript(kind, total){
     L.tie = t + 0.4; t += 4.8;
   } else {
     put(t, 'MR FORDHAM', 'THAT IS AWFUL. You are EXPELLED.', 3.6);
-    L.walk = t + 1.0; t += 4.2;
+    L.walk = t + 1.4; t += 5.4;
   }
   L.end = t + 1.6;
   return L;
@@ -7702,11 +7911,13 @@ function startFinale(kind, total){
   G.mode = 'finale'; G.phase = 'over';
   FIN.kind = kind; FIN.total = total; FIN.t = 0; FIN.step = 0; FIN.active = true;
   FIN.cooked = null; FIN.cookUsed = false; FIN.headWalk = false; FIN.greyed = false;
-  FIN.px = -1.2; FIN.pz = HALL.ZF - 2.5; FIN.vx = 0; FIN.vz = 0;
+  FIN.cookedShown = false; FIN.tieDone = false; FIN.endAt = 0; FIN.stepAcc = 0;
+  FIN.px = -2.0; FIN.pz = HALL.ZF - 1.30; FIN.py = HALL.STAGE_Y + 1.62;
+  FIN.vx = 0; FIN.vz = 0; FIN.vy = 0; FIN.roll = 0; FIN.fly = null; FIN.hit = 0;
   FIN.lines = finScript(kind, total);
   document.exitPointerLock && document.exitPointerLock();
   fadeTo(()=>{
-    renderer.domElement.requestPointerLock();
+    lockPointer();
     $('ui').style.display = 'none';
     $('hallHud').classList.remove('hidden');
     $('hallCapWrap').classList.remove('hidden');
@@ -7733,12 +7944,12 @@ function startFinale(kind, total){
     });
     Hall.setStaticStanding(false);
     // Mr Fordham at the lectern, the headmaster waiting in the wings
-    Hall.deputy.visible = true;
-    Hall.deputy.position.set(1.55, HALL.STAGE_Y, HALL.ZF - 1.75);
-    Hall.deputy.rotation.y = Math.PI;                 // addressing the hall, you beside him
     Hall.head.visible = true;
-    Hall.head.position.set(6.2, HALL.STAGE_Y, HALL.ZF - 5.6);
-    Hall.head.rotation.y = Math.PI - 0.9;
+    Hall.head.position.set(0, HALL.STAGE_Y, HALL.ZF - 2.78);      // the headmaster, at the lectern
+    Hall.head.rotation.y = Math.PI;                                // addressing the hall
+    Hall.deputy.visible = true;                                    // the deputy stands off to one side
+    Hall.deputy.position.set(4.9, HALL.STAGE_Y, HALL.ZF - 3.15);
+    Hall.deputy.rotation.y = Math.PI - 0.30;
     yaw = Math.PI; pitch = -0.06;
     showControlCue([['WASD','Move'],['F','Cook']], true, 'ON STAGE');
     clearInputEdges();
@@ -7749,8 +7960,8 @@ function startFinale(kind, total){
 }
 function finCookTarget(){
   const cands = [
-    { m:Hall.deputy, who:'MR FORDHAM' },
-    { m:Hall.head,   who:'HEADMASTER' }
+    { m:Hall.head,   who:'MR FORDHAM' },
+    { m:Hall.deputy, who:'THE DEPUTY' }
   ];
   for (const b of Hall.stageBoys || []) cands.push({ m:b, who:'A PREFECT' });
   for (const b of Hall.prefects  || []) cands.push({ m:b, who:'A PREFECT' });
@@ -7769,6 +7980,32 @@ function finCookTarget(){
 function updateFinale(dt){
   const S = Hall.S;
   FIN.t += dt;
+  /* ---- once he connects, you are not walking anywhere ---- */
+  if (FIN.fly){
+    const f = FIN.fly;
+    f.vy -= 20*dt;
+    FIN.px += f.vx*dt; FIN.py += f.vy*dt; FIN.pz += f.vz*dt;
+    yaw   += f.ay*dt;
+    pitch += f.ax*dt;
+    FIN.roll = (FIN.roll||0) + f.az*dt;
+    const FLOOR = 0.42;                                   // eye height, face down on the carpet
+    if (FIN.py <= FLOOR){
+      FIN.py = FLOOR;
+      if (f.vy < -2.2){ f.vy = -f.vy*0.30; f.vx*=0.6; f.vz*=0.6;
+                        f.ax*=0.5; f.ay*=0.5; f.az*=0.5; Audio_.bump(); camShakeY += 0.06; }
+      else { f.vy = 0; f.vx*=0.76; f.vz*=0.76; f.ax*=0.5; f.ay*=0.5; f.az*=0.5;
+             if (Math.hypot(f.vx,f.vz) < 0.5){ f.ax=f.ay=f.az=0;
+               pitch = lerp(pitch, -0.9, Math.min(1,dt*4)); FIN.roll = lerp(FIN.roll, 1.35, Math.min(1,dt*4)); } }
+    }
+    FIN.px = clamp(FIN.px, -HALL.W+0.6, HALL.W-0.6);
+    FIN.pz = clamp(FIN.pz, HALL.ZF-7.2, HALL.ZB-1.0);
+    if (FIN.hit && FIN.t - FIN.hit > 0.85 && !FIN.cookedShown){
+      FIN.cookedShown = true;
+      $('cookedOver').classList.remove('hidden');
+    }
+    E_finaleTail(dt);
+    return;
+  }
   /* ---- you can walk about up here. Everyone is watching. ---- */
   const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
   const rx =  Math.cos(yaw), rz = -Math.sin(yaw);
@@ -7777,8 +8014,9 @@ function updateFinale(dt){
   if (keys['KeyS']||keys['ArrowDown']) { mx-=fx; mz-=fz; }
   if (keys['KeyD']||keys['ArrowRight']){ mx+=rx; mz+=rz; }
   if (keys['KeyA']||keys['ArrowLeft']) { mx-=rx; mz-=rz; }
+  if (TOUCH.mv){ mx += fx*TOUCH.mv.y + rx*TOUCH.mv.x; mz += fz*TOUCH.mv.y + rz*TOUCH.mv.x; }
   const ml = Math.hypot(mx, mz);
-  const spd = (keys['ShiftLeft']||keys['ShiftRight']) ? 4.0 : 2.4;
+  const spd = (keys['ShiftLeft']||keys['ShiftRight']||TOUCH.run) ? 4.0 : 2.4;
   if (ml > 0.01){ FIN.vx += ((mx/ml)*spd - FIN.vx)*10*dt; FIN.vz += ((mz/ml)*spd - FIN.vz)*10*dt; }
   else { FIN.vx -= FIN.vx*9*dt; FIN.vz -= FIN.vz*9*dt; }
   FIN.px = clamp(FIN.px + FIN.vx*dt, FIN.X0, FIN.X1);
@@ -7793,8 +8031,8 @@ function updateFinale(dt){
       FIN.cooked = { m:t.m, t:0, who:t.who };
       Audio_.cook();
       camShakeX += rand(-0.05,0.05); camShakeY += 0.05;
-      logAura('Cooked ' + (t.who === 'MR FORDHAM' ? 'Mr Fordham on stage' :
-                           t.who === 'HEADMASTER' ? 'the headmaster on stage' :
+      logAura('Cooked ' + (t.who === 'MR FORDHAM' ? 'the headmaster on stage' :
+                           t.who === 'THE DEPUTY'  ? 'the deputy on stage' :
                            'a prefect on stage') + ' in front of the whole school', -12);
       banner('IN FRONT OF EVERYONE.', 'Nine hundred boys just saw you do that. −12 aura.', 3200);
     }
@@ -7807,7 +8045,8 @@ function updateFinale(dt){
     c.m.position.y = HALL.STAGE_Y - 0.55*k;
     if (c.t > 2.75){
       c.m.rotation.x = 0; c.m.position.y = HALL.STAGE_Y; FIN.cooked = null;
-      Hall.say(c.who, c.who === 'HEADMASTER' ? 'That will not help you.' : '… as I was saying.', 2.6);
+      Hall.say(c.who, c.who === 'THE DEPUTY' ? 'Sit down. Sit DOWN.'
+        : (FIN.headWalk ? 'That will not help you.' : '… as I was saying.'), 2.6);
     }
   }
 
@@ -7829,27 +8068,39 @@ function updateFinale(dt){
     banner('SCHOLARSHIP TIE.', 'The whole school is on its feet.', 4200);
   }
   if (FIN.kind === 'bad' && L.walk && FIN.t >= L.walk) FIN.headWalk = true;
-  if (FIN.headWalk && !FIN.greyed){
+  if (FIN.headWalk && !FIN.greyed && !FIN.cooked){
     const h = Hall.head.position;
     const dx = FIN.px - h.x, dz = (FIN.pz + 1.05) - h.z, d = Math.hypot(dx, dz);
     if (d > 0.05){
-      const st = Math.min(d, 2.5*dt);
+      const st = Math.min(d, 1.55*dt);
       h.x += (dx/d)*st; h.z += (dz/d)*st;
       Hall.head.rotation.y = Math.atan2(dx, dz);
       FIN.stepAcc = (FIN.stepAcc||0) + st;
       if (FIN.stepAcc > 0.55){ FIN.stepAcc = 0; Audio_.step(1.5/(1+d*0.4)); }
     }
     if (d < 1.15){
-      FIN.greyed = true;
+      FIN.greyed = true; FIN.hit = FIN.t;
       Audio_.cook(); Audio_.sting();
-      camShakeX += 0.10; camShakeY += 0.08;
+      camShakeX += 0.12; camShakeY += 0.10;
       renderer.domElement.style.filter = 'grayscale(1) contrast(1.15) brightness(0.72)';
-      $('cookedOver').classList.remove('hidden');
       $('hallCapWrap').style.opacity = 0;
       hideControlCue();
-      FIN.endAt = FIN.t + 3.4;
+      // straight off the front of the stage, same boot the vaper gets
+      const ax = FIN.px - h.x, az = FIN.pz - h.z, al = Math.hypot(ax,az) || 1;
+      const POW = 9.5;
+      FIN.fly = { vx:(ax/al)*POW*0.55 + rand(-1.2,1.2),
+                  vy: POW*0.80 + rand(0.4,1.2),
+                  vz: Math.max(7.6, (az/al)*POW) + rand(0,1.8),
+                  ax: rand(4.5,8.5)*(Math.random()<0.5?-1:1),
+                  ay: rand(2.0,4.5)*(Math.random()<0.5?-1:1),
+                  az: rand(6.0,10.5)*(Math.random()<0.5?-1:1) };
+      FIN.endAt = FIN.t + 4.2;
     }
   }
+  E_finaleTail(0);
+}
+function E_finaleTail(dt){
+  const L = FIN.lines;
   const done = FIN.greyed ? (FIN.endAt && FIN.t >= FIN.endAt) : (FIN.t >= L.end);
   if (done && FIN.active){
     FIN.active = false;
@@ -7900,6 +8151,7 @@ function loop(now){
   if (G.started && G.mode==='bay') updatePunish(dt);
   updateCamera(dt);
   updateSceneTitle();
+  updateTouchUI();
   updateHUD();
   // audio ambience
   const camX=camera.position.x;
@@ -8042,9 +8294,11 @@ function resetGame(){
   startRound();
   G.started=true;
 }
-/* A touchscreen with no fine pointer is a phone or a tablet.  A laptop with a
-   touchscreen still reports a fine pointer, so it is not caught by this. */
-const TOUCH_ONLY = (navigator.maxTouchPoints > 0 || 'ontouchstart' in window)
+/* Phones and tablets are let straight in like everyone else.  Flip BLOCK_MOBILE
+   back to true to put the "not on mobile" wall back up. */
+const BLOCK_MOBILE = false;
+const TOUCH_ONLY = BLOCK_MOBILE
+                && (navigator.maxTouchPoints > 0 || 'ontouchstart' in window)
                 && !(window.matchMedia && window.matchMedia('(pointer: fine)').matches);
 if (TOUCH_ONLY){
   $('startOver').style.display = 'none';      // inline, so nothing can put it back
@@ -8056,23 +8310,485 @@ if (TOUCH_ONLY){
 // browsers park the audio context until the page has been interacted with
 for (const ev of ['pointerdown','keydown']) addEventListener(ev, ()=>Audio_.resume(), {passive:true});
 
+var PLAYER_NAME = '';
 $('startBtn').onclick = ()=>{
+  if (lbOn()){
+    const c = lbClean($('startNameInput').value);
+    if (!c.ok){
+      const m = $('startNameMsg'); m.textContent = c.why; m.className = 'lbMsg bad';
+      const box = $('startName');
+      box.classList.remove('shake'); void box.offsetWidth; box.classList.add('shake');
+      $('startNameInput').focus();
+      return;
+    }
+    PLAYER_NAME = c.name;
+    lbRemember(PLAYER_NAME);
+    $('startNameInput').blur();          // hand the keyboard back to the game
+  }
   Audio_.init();
   Audio_.resume();
   $('startOver').classList.add('hidden');
   $('ui').style.display='';
-  renderer.domElement.requestPointerLock();
+  lockPointer();
   startAssembly();
 };
 $('againBtn').onclick = ()=>{
   location.reload();          // a fresh page — nothing carried over from the last run
+};
+function lbMine(){
+  const t = auraTotal();
+  return { name: PLAYER_NAME, aura: t, grade: auraGrade(t).name };
+}
+$('boardBtn').onclick      = ()=>{ $('resultOver').classList.add('hidden'); lbOpen(lbMine()); };
+$('startBoardBtn').onclick = ()=>{ $('startOver').classList.add('hidden'); lbOpen(null); };
+$('lbGo').onclick          = ()=>{ lbSend(lbMine()); };
+$('lbName').onkeydown      = (e)=>{ e.stopPropagation(); if (e.key==='Enter') lbSend(lbMine()); };
+$('lbBack').onclick = ()=>{
+  lbClose();
+  if (G.started && G.phase==='over') $('resultOver').classList.remove('hidden');
+  else $('startOver').classList.remove('hidden');
 };
 addEventListener('resize', ()=>{
   camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
   renderer.setSize(innerWidth,innerHeight);
 });
 
+
+/* ============================================================
+   15.  LEADERBOARD  (Supabase)
+   ------------------------------------------------------------
+   Paste your project URL and anon key below and it switches on.
+   Leave them blank and the game runs exactly as before, with the
+   board showing a "not connected" note instead.
+   ============================================================ */
+const LB = {
+  url : 'https://vnycdreguqczsgpaamin.supabase.co',
+  key : 'sb_publishable_TcQ1mgz8_Shq5gi3VEKarA_FJh7F0ga',
+  table : 'scores',
+  top : 25,
+  busy : false, sent : false, rows : null, err : null
+};
+function lbOn(){ return !!(LB.url && LB.key); }
+function lbHead(){ return { apikey: LB.key, Authorization: 'Bearer ' + LB.key,
+                            'Content-Type': 'application/json' }; }
+
+/* ---- names: short, printable, and nothing you would not want on a wall ----
+
+   Two lists, because "Scunthorpe" is a real place and "assassin" is a real word.
+     LB_HARD  matched anywhere in the name  - these are never innocent
+     LB_SOFT  matched as a whole word only  - fine inside Grass, Cocktail, analysis
+   Both are checked against a flattened copy of the name: lower-cased, leetspeak
+   folded back to letters, everything else deleted, so "$h1t", "f u c k" and
+   "fuuuck" all land on the same string.                                        */
+const LB_NOTCOOL = 'Not a cool name. Try another one.';
+const LB_LEET = {'0':'o','1':'i','3':'e','4':'a','5':'s','7':'t','8':'b','9':'g',
+                 '@':'a','$':'s','!':'i','|':'i','+':'t','(':'c'};
+function lbFlat(str){
+  return String(str||'').toLowerCase()
+    .replace(/[013457890@$!|+(]/g, c => LB_LEET[c] || '')
+    .replace(/[^a-z]/g, '');
+}
+const LB_SQ = t => t.replace(/(.)\1+/g, '$1');          // fuuuck -> fuck
+
+const LB_HARD = ('fuck fuk fck phuck fuc shit shyt cunt nigg nigr negro chink gook kike paki '
+  + 'wetback tranny faggot fagot molest rapist hitler nazi kkk jihad isis pedo paedo whore '
+  + 'chingchong chongching chinky slanteye currymuncher towelhead '
+  + 'wank twat bollock jizz cumshot blowjob dildo boner scrotum masturb suicide selfharm '
+  + 'bitch btch slut bastard retard prick pussy pusy kys kms '
+  + 'fordham headmaster deputy principal westlakeboys moderator').split(' ');
+
+const LB_SOFT = ('ass arse asses anal anus cum cock kock dick dik hoe sex sexy tit tits titty '
+  + 'boob boobs bum poo poop pee wee fart turd balls crap piss gay homo spaz spic coon abo '
+  + 'weed vape meth coke cocaine heroin kill killer murder rape raped penis peni vagina vag '
+  + 'horny semen sperm orgasm knob minge shag nude naked '
+  + 'goon goons gooner gooners gooning goonin gooned edging simp').split(' ');
+
+function lbNasty(raw){
+  const flat = lbFlat(raw), sq = LB_SQ(flat);
+  for (const w of LB_HARD) if (flat.indexOf(w) >= 0 || sq.indexOf(w) >= 0) return true;
+  // "G o o n" spells one word, not four
+  for (const w of LB_SOFT) if (flat === w || sq === w) return true;
+  // whole words only, so Grass, Cocktail and analysis all get through
+  for (const t of String(raw||'').split(/[^0-9A-Za-z@$!|+(]+/)){
+    const f = lbFlat(t); if (!f) continue;
+    // xXwordXx padding is not a disguise: peel any number of x's off either end
+    const forms = new Set();
+    for (const base of [f, LB_SQ(f)]){
+      let lead = 0; while (lead < base.length && base[lead] === 'x') lead++;
+      let tail = 0; while (tail < base.length && base[base.length-1-tail] === 'x') tail++;
+      for (let a = 0; a <= lead; a++) for (let z = 0; z <= tail; z++){
+        if (a + z >= base.length) continue;
+        forms.add(base.slice(a, base.length - z));
+      }
+    }
+    for (const w of LB_SOFT) if (forms.has(w)) return true;
+  }
+  return false;
+}
+
+function lbClean(raw){
+  let n = String(raw||'').replace(/\s+/g,' ').trim().slice(0,14);
+  if (lbNasty(n)) return { ok:false, why: LB_NOTCOOL };   // check before stripping symbols
+  n = n.replace(/[^\w \-'.]/g,'').replace(/\s+/g,' ').trim();
+  if (!n) return { ok:false, why:'Put a name in first.' };
+  if (n.length < 2) return { ok:false, why:'A bit longer than that.' };
+  if (lbNasty(n)) return { ok:false, why: LB_NOTCOOL };   // and again once they are gone
+  return { ok:true, name:n };
+}
+function lbRemember(n){ try{ localStorage.setItem('wbhs.name', n); }catch(e){} }
+function lbRecall(){ try{ return localStorage.getItem('wbhs.name')||''; }catch(e){ return ''; } }
+
+async function lbFetch(){
+  if (!lbOn()) { LB.err = 'off'; return null; }
+  try{
+    const r = await fetch(LB.url + '/rest/v1/' + LB.table
+        + '?select=name,aura,grade&order=aura.desc&limit=' + LB.top, { headers: lbHead() });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    LB.rows = await r.json(); LB.err = null;
+    return LB.rows;
+  } catch(e){ LB.err = e.message || 'could not reach the leaderboard'; return null; }
+}
+async function lbSubmit(name, aura, grade){
+  if (!lbOn()) return { ok:false, why:'The leaderboard is not switched on yet.' };
+  try{
+    const r = await fetch(LB.url + '/rest/v1/' + LB.table, {
+      method:'POST', headers: Object.assign(lbHead(), {Prefer:'return=minimal'}),
+      body: JSON.stringify({ name, aura, grade })
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status + ' — ' + (await r.text()).slice(0,90));
+    return { ok:true };
+  } catch(e){ return { ok:false, why: e.message }; }
+}
+
+/* ---- how many are above you, and how many played at all ---- */
+async function lbCount(extra){
+  const r = await fetch(LB.url + '/rest/v1/' + LB.table + '?select=id' + (extra||''),
+    { headers: Object.assign(lbHead(), { Prefer:'count=exact', Range:'0-0' }) });
+  // an empty table answers 416 with "*/0" — still a perfectly good count
+  if (!r.ok && r.status !== 416) throw new Error('HTTP ' + r.status);
+  const cr = r.headers.get('content-range') || '';
+  const n = parseInt(cr.split('/')[1], 10);
+  if (!isFinite(n)) throw new Error('no count header');
+  return n;
+}
+async function lbPlacing(aura){
+  // fast path: PostgREST hands the totals back in a Content-Range header
+  try{
+    const [better, total] = await Promise.all([ lbCount('&aura=gt.' + aura), lbCount('') ]);
+    return { rank: better + 1, total: total };
+  } catch(e){ /* header not exposed to us — count them by hand instead */ }
+  const r = await fetch(LB.url + '/rest/v1/' + LB.table + '?select=aura', { headers: lbHead() });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const all = await r.json();
+  let better = 0;
+  for (const x of all) if (x.aura > aura) better++;
+  return { rank: better + 1, total: all.length };
+}
+
+/* ---- end of the day: put them on the board, then tell them where they landed ---- */
+async function lbFinish(){
+  const el = $('rPlace');
+  if (!el) return;
+  if (!lbOn() || !PLAYER_NAME){ el.className = 'hidden'; return; }
+  el.className = '';
+  $('rPlaceNum').textContent = '\u2026';
+  $('rPlaceSub').textContent = 'Putting ' + PLAYER_NAME + ' on the board\u2026';
+
+  const mine = lbMine();
+  if (!LB.sent){
+    const res = await lbSubmit(PLAYER_NAME, mine.aura, mine.grade);
+    if (!res.ok){
+      el.className = 'bad';
+      $('rPlaceNum').textContent = '\u2014';
+      $('rPlaceSub').textContent = 'Could not reach the board. Hit LEADERBOARD to try again.';
+      return;
+    }
+    LB.sent = true;
+    lbRemember(PLAYER_NAME);
+  }
+  try{
+    const p = await lbPlacing(mine.aura);
+    el.className = p.rank===1 ? 'g' : p.rank===2 ? 's' : p.rank===3 ? 'b' : '';
+    $('rPlaceNum').textContent = '#' + p.rank;
+    let sub;
+    if (p.rank === 1)        sub = 'TOP OF THE SCHOOL \u2014 out of ' + p.total + ' who have played';
+    else if (p.rank <= 3)    sub = 'on the podium \u2014 out of ' + p.total + ' who have played';
+    else if (p.total >= 10)  sub = 'out of ' + p.total + ' \u2014 top '
+                                 + Math.max(1, Math.round(p.rank / p.total * 100)) + '% of the school';
+    else                     sub = 'out of ' + p.total + ' who have played';
+    $('rPlaceSub').textContent = sub;
+  } catch(e){
+    $('rPlaceNum').textContent = '\u2713';
+    $('rPlaceSub').textContent = 'You are on the board. Hit LEADERBOARD to see it.';
+  }
+  lbFetch();                        // warm the top 25 so the board opens instantly
+}
+
+/* ---- drawing the board ---- */
+function lbRender(mine){
+  const box = $('lbList');
+  if (!box) return;
+  if (!lbOn()){
+    box.innerHTML = '<div class="lbNote">The leaderboard is not connected yet.<br>'
+      + 'Open the file and put your Supabase URL and key at the top.</div>';
+    return;
+  }
+  if (LB.err && LB.err !== 'off'){
+    box.innerHTML = '<div class="lbNote">Could not reach the leaderboard.<br><small>'
+      + LB.err + '</small></div>'; return;
+  }
+  const rows = LB.rows;
+  if (!rows){ box.innerHTML = '<div class="lbNote">Loading…</div>'; return; }
+  if (!rows.length){ box.innerHTML = '<div class="lbNote">Nobody on the board yet. Be first.</div>'; return; }
+  let done = false;
+  box.innerHTML = rows.map((r,i)=>{
+    const me = (!done && mine && r.name === mine.name && r.aura === mine.aura) ? (done = true, ' me') : '';
+    const medal = i===0 ? 'g' : i===1 ? 's' : i===2 ? 'b' : '';
+    return '<div class="lbRow'+me+'">'
+      + '<u class="'+medal+'">' + (i+1) + '</u>'
+      + '<i>' + String(r.name).replace(/[<>&]/g,'') + '</i>'
+      + '<em>' + (r.grade||'') + '</em>'
+      + '<b>' + r.aura + '</b></div>';
+  }).join('');
+}
+async function lbOpen(mine){
+  $('lbOver').classList.remove('hidden');
+  $('lbForm').classList.toggle('hidden', !mine || LB.sent || !lbOn());
+  if (mine){
+    $('lbMyAura').textContent = mine.aura;
+    $('lbMyGrade').textContent = mine.grade;
+    const inp = $('lbName');
+    if (!inp.value) inp.value = PLAYER_NAME || lbRecall();
+  }
+  LB.rows = null; lbRender(mine);
+  await lbFetch();
+  lbRender(mine);
+}
+function lbClose(){ $('lbOver').classList.add('hidden'); }
+async function lbSend(mine){
+  if (LB.busy || LB.sent) return;
+  const c = lbClean($('lbName').value);
+  const msg = $('lbMsg');
+  if (!c.ok){ msg.textContent = c.why; msg.className = 'lbMsg bad'; return; }
+  LB.busy = true; msg.textContent = 'Sending…'; msg.className = 'lbMsg';
+  $('lbGo').disabled = true;
+  const res = await lbSubmit(c.name, mine.aura, mine.grade);
+  LB.busy = false; $('lbGo').disabled = false;
+  if (!res.ok){ msg.textContent = res.why; msg.className = 'lbMsg bad'; return; }
+  LB.sent = true; lbRemember(c.name);
+  msg.textContent = 'You are on the board.'; msg.className = 'lbMsg good';
+  $('lbForm').classList.add('hidden');
+  await lbFetch();
+  lbRender({ name:c.name, aura:mine.aura, grade:mine.grade });
+}
+
+/* the name box only makes sense when the board is switched on */
+(function(){
+  const box = $('startName'), inp = $('startNameInput');
+  if (!box || !inp) return;
+  if (!lbOn()){ box.classList.add('hidden'); return; }
+  inp.value = lbRecall();
+  inp.onkeydown = (e)=>{ e.stopPropagation(); if (e.key === 'Enter'){ e.preventDefault(); $('startBtn').click(); } };
+  inp.onkeyup   = (e)=>{ e.stopPropagation(); };
+  inp.oninput   = ()=>{ const m = $('startNameMsg'); m.textContent = ''; m.className = 'lbMsg'; };
+})();
+
+
+/* ============================================================
+   16.  TOUCH CONTROLS  -  phones and tablets
+   ------------------------------------------------------------
+   Left half of the screen is a floating stick, right half is the
+   look-around, and the round buttons bottom-right are whatever
+   the scene you are in actually needs.  Everything funnels into
+   the same globals the keyboard writes to, so the game itself
+   does not know the difference.
+   ============================================================ */
+const TOUCH = {
+  on:false, mv:null, run:false, back:false,
+  mvId:null, lookId:null, ox:0, oy:0, lx:0, ly:0, ldist:0, lt:0, sig:' '
+};
+function lockPointer(){
+  if (TOUCH.on) return;                       // pointer lock means nothing on a phone
+  const el = renderer.domElement;
+  if (el && el.requestPointerLock) el.requestPointerLock();
+}
+function tuiLookBlocked(){
+  if (G.mode==='assembly' && (Hall.S.scoldT>0 || Hall.S.allTurn>0)) return true;
+  if (G.mode==='gda' && GDAScene.S.scare>0) return true;
+  if (G.mode==='lunch' && (Lunch.S.scold>0 || Lunch.S.det>0)) return true;
+  return false;
+}
+const TUI_R = 72;                              // how far the stick travels, in px
+function tuiSetStick(dx, dy){
+  const d = Math.hypot(dx, dy);
+  const k = d > TUI_R ? TUI_R/d : 1;
+  const knob = $('tuiStick').firstElementChild;
+  knob.style.transform = 'translate(' + (dx*k).toFixed(1) + 'px,' + (dy*k).toFixed(1) + 'px)';
+  const mag = Math.min(1, d/TUI_R);
+  if (mag < 0.20){ TOUCH.mv = null; TOUCH.run = false; TOUCH.back = false; }
+  else {
+    const n = Math.max(d, 0.0001);
+    TOUCH.mv = { x: dx/n, y: -dy/n };          // screen-up is forward
+    TOUCH.run  = mag > 0.92;
+    TOUCH.back = TOUCH.mv.y < -0.62;           // pull back to step out of a queue
+  }
+  $('tuiStick').classList.toggle('run', TOUCH.run);
+}
+function tuiDropStick(){
+  TOUCH.mvId = null; TOUCH.mv = null; TOUCH.run = false; TOUCH.back = false;
+  $('tuiStick').classList.add('hidden');
+  $('tuiStick').classList.remove('run');
+}
+function tuiTouchStart(e){
+  for (const t of e.changedTouches){
+    if (t.clientX < innerWidth*0.5 && TOUCH.mvId === null){
+      TOUCH.mvId = t.identifier; TOUCH.ox = t.clientX; TOUCH.oy = t.clientY;
+      const st = $('tuiStick');
+      st.style.left = t.clientX + 'px'; st.style.top = t.clientY + 'px';
+      st.classList.remove('hidden');
+      tuiSetStick(0, 0);
+      $('tuiHint').classList.add('hidden');
+    } else if (TOUCH.lookId === null){
+      TOUCH.lookId = t.identifier; TOUCH.lx = t.clientX; TOUCH.ly = t.clientY;
+      TOUCH.ldist = 0; TOUCH.lt = performance.now();
+    }
+  }
+  if (e.cancelable) e.preventDefault();
+}
+function tuiTouchMove(e){
+  for (const t of e.changedTouches){
+    if (t.identifier === TOUCH.mvId){
+      tuiSetStick(t.clientX - TOUCH.ox, t.clientY - TOUCH.oy);
+    } else if (t.identifier === TOUCH.lookId){
+      const dx = t.clientX - TOUCH.lx, dy = t.clientY - TOUCH.ly;
+      TOUCH.lx = t.clientX; TOUCH.ly = t.clientY;
+      TOUCH.ldist += Math.abs(dx) + Math.abs(dy);
+      if (tuiLookBlocked()) continue;
+      yaw   -= clamp(dx, -160, 160) * 0.0050;
+      pitch -= clamp(dy, -160, 160) * 0.0050;
+      pitch = clamp(pitch, -1.15, 0.95);
+    }
+  }
+  if (e.cancelable) e.preventDefault();
+}
+function tuiTouchEnd(e){
+  for (const t of e.changedTouches){
+    if (t.identifier === TOUCH.mvId) tuiDropStick();
+    else if (t.identifier === TOUCH.lookId){
+      // a tap that did not really move counts as a click: waking up, popping words
+      if (TOUCH.ldist < 16 && performance.now() - TOUCH.lt < 320) clickEdge = true;
+      TOUCH.lookId = null;
+    }
+  }
+}
+
+/* ---- the buttons, built from whatever the scene needs right now ---- */
+function tuiPress(act){
+  if (act === 'ctrl'){ bracing = true; return; }
+  if (act === 'tap'){ clickEdge = true; return; }
+  if (act === 'Space'){ shovePressed = true; spaceEdge++; edges.Space = (edges.Space||0)+1; return; }
+  if (act === 'KeyF'){ cookPressed = true; edges.KeyF = (edges.KeyF||0)+1; return; }
+  if (act === 'KeyE'){ eEdge = true; edges.KeyE = (edges.KeyE||0)+1; tuiRideCheck(); return; }
+  if (act === 'KeyQ'){ qEdge = true; edges.KeyQ = (edges.KeyQ||0)+1; return; }
+  edges[act] = (edges[act]||0)+1;              // Key<letter> to stand or clap, Digit1-4 in the exam
+}
+function tuiRelease(act){ if (act === 'ctrl') bracing = false; }
+// E on the bus is handled in the keydown listener, so mirror it here
+function tuiRideCheck(){
+  if (!(G.playerBoarded && G.started && G.mode === 'bay' && G.phase !== 'over')) return;
+  G.rideSkip = true;
+  const total = sealAura();
+  if (total >= FIN_GOOD)     startFinale('good', total);
+  else if (total <= FIN_BAD) startFinale('bad',  total);
+  else endGame();
+}
+
+function tuiSpec(){
+  if (!G.started) return [];
+  if (G.mode === 'finale') return [['COOK','KeyF','big']];
+  if (G.phase === 'over')  return [];
+  if (G.mode === 'assembly'){
+    const S = Hall.S;
+    if (S.done) return [];
+    const a = [];
+    if (S.phase === 'rush') a.push(['SIT','KeyE']);
+    a.push([S.standL + '~STAND', 'Key' + S.standL]);
+    a.push([S.clapL  + '~CLAP',  'Key' + S.clapL]);
+    if (S.phoneT > 0 && S.phoneMine) a.push(['QUIET','KeyQ']);
+    if (S.sleeping) a.push(['WAKE UP','tap']);
+    if (S.phase === 'leaving') a.push(['PUSH','Space']);
+    return a;
+  }
+  if (G.mode === 'lunch'){
+    if (Lunch.S.done) return [];
+    return [['ORDER','KeyE'],['COOK','KeyF'],['BRACE','ctrl'],['PUSH','Space']];
+  }
+  if (G.mode === 'gda'){
+    if (GDAScene.S.done) return [];
+    return [['TAB','KeyE'],['JUMP','Space','big']];
+  }
+  if (G.mode === 'exam'){
+    if (ExamScene.S.done) return [];
+    return [['1','Digit1','big'],['2','Digit2','big'],['3','Digit3','big'],['4','Digit4','big']];
+  }
+  if (G.inDetention)   return [['E','KeyE','big']];
+  if (G.playerBoarded) return [['SCORE','KeyE']];
+  return [['COOK','KeyF'],['BRACE','ctrl'],['PUSH','Space']];
+}
+function tuiLabel(t){
+  const i = t.indexOf('~');                   // "J~STAND" -> big J over a small STAND
+  return i < 0 ? t : t.slice(0,i) + '<br><small>' + t.slice(i+1) + '</small>';
+}
+function updateTouchUI(){
+  if (!TOUCH.on) return;
+  const spec = tuiSpec();
+  const sig = spec.map(x => x[0] + ':' + x[1] + ':' + (x[2]||'')).join('|');
+  if (sig === TOUCH.sig) return;
+  TOUCH.sig = sig;
+  const pad = $('tuiPad');
+  $('tui').style.setProperty('--cols', spec.length > 3 ? 2 : Math.max(1, spec.length));
+  pad.innerHTML = spec.map(function(it, i){
+    return '<div class="tb' + (it[2] ? ' ' + it[2] : '') + '" data-i="' + i + '">'
+         + tuiLabel(it[0]) + '</div>';
+  }).join('');
+  for (const el of pad.children){
+    const act = spec[+el.dataset.i][1];
+    el.addEventListener('touchstart', function(ev){
+      ev.preventDefault(); ev.stopPropagation();
+      el.classList.add('on'); tuiPress(act);
+    }, {passive:false});
+    const off = function(ev){ ev.preventDefault(); ev.stopPropagation();
+                              el.classList.remove('on'); tuiRelease(act); };
+    el.addEventListener('touchend', off, {passive:false});
+    el.addEventListener('touchcancel', off, {passive:false});
+  }
+}
+
+(function(){
+  const q = location.search || '';
+  const forced = /[?&]touch=1/.test(q), off = /[?&]touch=0/.test(q);
+  TOUCH.on = !off && (forced || (navigator.maxTouchPoints||0) > 0 || 'ontouchstart' in window);
+  if (!TOUCH.on) return;
+  document.body.classList.add('touch');
+  $('tui').classList.remove('hidden');
+  $('tuiRotate').classList.add('armed');
+  $('tuiHint').innerHTML = 'LEFT SIDE &mdash; MOVE<br>RIGHT SIDE &mdash; LOOK';
+  $('tuiHint').classList.remove('hidden');
+  const cv = renderer.domElement;
+  cv.addEventListener('touchstart', tuiTouchStart, {passive:false});
+  addEventListener('touchmove',   tuiTouchMove, {passive:false});
+  addEventListener('touchend',    tuiTouchEnd,  {passive:false});
+  addEventListener('touchcancel', tuiTouchEnd,  {passive:false});
+  cv.addEventListener('click', function(e){ e.preventDefault(); });
+})();
+
 window.__BBB = { G, camera, buses, agents, scene, renderer, Audio_,
+  LB, lbOn, lbClean, lbFetch, lbSubmit, lbOpen, lbClose, lbSend, lbRender, lbMine(){ return lbMine(); },
+  lbCount, lbPlacing, lbFinish,
+  TOUCH, tuiSpec, updateTouchUI, tuiPress,
+  boardTexture, BOARD_CREDITS, BOARD_PREFECTS, BOARD_SUPPORTERS, Hall,
+  get playerName(){ return PLAYER_NAME; }, setPlayerName(n){ PLAYER_NAME = n; },
+  showResult(){ showResult(); },
   get player(){ return player; },
   jumpToBay(){ G.busX = G.targetBay; G.busV = 0; G.phase='arrive'; for(const a of agents) a.committed=true; },
   look(y,p){ yaw=y; pitch=p; },
