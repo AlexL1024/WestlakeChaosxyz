@@ -2460,7 +2460,8 @@ const BOARD_PREFECTS = { title:'SENIOR PREFECTS', rows:[
   { r:'MUSIC CAPTAIN',    n:'HUGH REID' },
   { r:'SERVICE CAPTAIN',  n:'VINAY VARADARAJAN' } ] };
 const BOARD_SUPPORTERS = { title:'SUPPORTERS',
-  rows:[ {n:'BEVIS JIANG'}, {n:'MIN-SEO BANG'} ] };
+  rows:[ {n:'BEVIS JIANG'}, {n:'MIN-SEO BANG'}, {n:'MIGUEL CHAN'},
+         {n:'EVAN LI'}, {n:'ROID KIM'} ] };
 
 function fitFont(g, txt, maxW, px, weight, fam){
   for (let sz = px; sz > 8; sz -= 1){
@@ -8873,11 +8874,24 @@ function lbSetBest(v){ try{ localStorage.setItem('wbhs.best', String(v)); }catch
 function lbRemember(n){ try{ localStorage.setItem('wbhs.name', n); }catch(e){} }
 function lbRecall(){ try{ return localStorage.getItem('wbhs.name')||''; }catch(e){ return ''; } }
 
+/* The board is a database view that keeps one row per device.  If that view has
+   not been created yet the read comes back 404, so fall back to the raw table and
+   remember not to try again.  The game works either way; without the view you
+   just see every run rather than each player's best. */
+let _lbNoView = false;
+async function lbRead(qs, headers){
+  const first = _lbNoView ? LB.table : LB.board;
+  let r = await fetch(LB.url + '/rest/v1/' + first + qs, { headers: headers || lbHead() });
+  if (r.status === 404 && !_lbNoView){
+    _lbNoView = true;
+    r = await fetch(LB.url + '/rest/v1/' + LB.table + qs, { headers: headers || lbHead() });
+  }
+  return r;
+}
 async function lbFetch(){
   if (!lbOn()) { LB.err = 'off'; return null; }
   try{
-    const r = await fetch(LB.url + '/rest/v1/' + LB.board
-        + '?select=name,aura,grade&order=aura.desc&limit=' + LB.top, { headers: lbHead() });
+    const r = await lbRead('?select=name,aura,grade&order=aura.desc&limit=' + LB.top);
     if (!r.ok) throw new Error('HTTP ' + r.status);
     LB.rows = lbSane(await r.json()); LB.err = null;
     repaintHallLB();                       // the board on the hall wall follows the real one
@@ -8934,14 +8948,27 @@ function sha256hex(msg){
 }
 function lbSign(name, aura, dev){ return sha256hex(name + '|' + aura + '|' + dev + '|' + LB_SALT); }
 
+let _lbPlainPost = false;      // true once we learn the table has no sig/device columns
 async function lbSubmit(name, aura, grade){
   if (!lbOn()) return { ok:false, why:'The leaderboard is not switched on yet.' };
   const dev = lbDevice();
-  try{
-    const r = await fetch(LB.url + '/rest/v1/' + LB.table, {
+  const post = function(body){
+    return fetch(LB.url + '/rest/v1/' + LB.table, {
       method:'POST', headers: Object.assign(lbHead(), {Prefer:'return=minimal'}),
-      body: JSON.stringify({ name, aura, grade, device: dev, sig: lbSign(name, aura, dev) })
+      body: JSON.stringify(body)
     });
+  };
+  try{
+    const full = { name, aura, grade, device: dev, sig: lbSign(name, aura, dev) };
+    let r = await (_lbPlainPost ? post({ name, aura, grade }) : post(full));
+    // an older table has no sig or device column; send the plain row instead
+    if (!r.ok && r.status === 400 && !_lbPlainPost){
+      const msg = await r.text();
+      if (/sig|device|column/i.test(msg)){
+        _lbPlainPost = true;
+        r = await post({ name, aura, grade });
+      } else throw new Error('HTTP 400 — ' + msg.slice(0,90));
+    }
     if (!r.ok) throw new Error('HTTP ' + r.status + ' — ' + (await r.text()).slice(0,90));
     return { ok:true };
   } catch(e){ return { ok:false, why: e.message }; }
@@ -8949,8 +8976,8 @@ async function lbSubmit(name, aura, grade){
 
 /* ---- how many are above you, and how many played at all ---- */
 async function lbCount(extra){
-  const r = await fetch(LB.url + '/rest/v1/' + LB.board + '?select=aura' + (extra||''),
-    { headers: Object.assign(lbHead(), { Prefer:'count=exact', Range:'0-0' }) });
+  const r = await lbRead('?select=aura' + (extra||''),
+    Object.assign(lbHead(), { Prefer:'count=exact', Range:'0-0' }));
   // an empty table answers 416 with "*/0" — still a perfectly good count
   if (!r.ok && r.status !== 416) throw new Error('HTTP ' + r.status);
   const cr = r.headers.get('content-range') || '';
@@ -8964,7 +8991,7 @@ async function lbPlacing(aura){
     const [better, total] = await Promise.all([ lbCount('&aura=gt.' + aura), lbCount('') ]);
     return { rank: better + 1, total: total };
   } catch(e){ /* header not exposed to us — count them by hand instead */ }
-  const r = await fetch(LB.url + '/rest/v1/' + LB.board + '?select=aura', { headers: lbHead() });
+  const r = await lbRead('?select=aura');
   if (!r.ok) throw new Error('HTTP ' + r.status);
   const all = await r.json();
   let better = 0;
@@ -9363,7 +9390,8 @@ const __DEV = /[?&]dev=1/.test(location.search || '');
 if (__DEV) window.__BBB = { G, camera, buses, agents, scene, renderer, Audio_,
   LB, lbOn, lbClean, lbFetch, lbSubmit, lbOpen, lbClose, lbSend, lbRender, lbMine(){ return lbMine(); },
   lbCount, lbPlacing, lbFinish,
-  lbSign, sha256hex, lbSane, lbDevice, lbBest, lbSetBest,
+  lbSign, sha256hex, lbSane, lbDevice, lbBest, lbSetBest, lbRead,
+  noView(){ return _lbNoView; },
   TOUCH, tuiSpec, updateTouchUI, tuiPress,
   sendToDetention, startDetention, detAnswer, DET_QS, goToBay,
   lunchDetentionStart,
