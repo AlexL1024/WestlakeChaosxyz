@@ -1165,16 +1165,45 @@ function atLogoTexture(){
   g.fillText('Metro', 130, 66);
   const t=new THREE.CanvasTexture(c); return t;
 }
-// the school buses that turn up, and how often — 032 comes twice as often as the rest
+/* AT's own blind, as against the school buses': no white header, just amber dots.
+   Destination large, the road it runs down underneath it, route number in its own
+   column on the right.  Measured with fitFont for the same reason the NX2 is —
+   Segoe is not there on most machines and the fallback runs wide. */
+function ledTextureEV(dest, sub, num){
+  const c=document.createElement('canvas'); c.width=768; c.height=176;
+  const g=c.getContext('2d');
+  const F='"Segoe UI",Arial,sans-serif';
+  g.fillStyle='#05060a'; g.fillRect(0,0,768,176);
+  g.textBaseline='alphabetic';
+  const COL = 546;                                   // where the route number's column starts
+  g.fillStyle='#ffb42e'; g.textAlign='left';
+  g.font='bold '+fitFont(g,dest,COL-42,92,'bold',F)+'px '+F;
+  g.fillText(dest, 20, 96);
+  g.font='bold '+fitFont(g,sub,COL-42,46,'bold',F)+'px '+F;
+  g.fillText(sub, 20, 152);
+  g.textAlign='right';
+  g.font='bold '+fitFont(g,num,768-COL-26,102,'bold',F)+'px '+F;
+  g.fillText(num, 748, 128);
+  g.globalCompositeOperation='destination-out'; g.fillStyle='#000';
+  for (let y=0;y<176;y+=4) g.fillRect(0,y+3,768,1);
+  for (let x=0;x<768;x+=4) g.fillRect(x+3,0,1,176);
+  g.globalCompositeOperation='source-over';
+  return new THREE.CanvasTexture(c);
+}
+// the buses that turn up, and how often — 032 and the 871 come twice as often as the rest
 const SCHOOL_ROUTES = [
   { n:'033', dest:null,                 w:1 },
   { n:'032', dest:null,                 w:2 },
   { n:'449', dest:null,                 w:1 },
   { n:'049', dest:'Silverdale - Manly', w:1 },   // the only one that still runs the old route
-  { n:'034', dest:null,                 w:1 }
+  { n:'034', dest:null,                 w:1 },
+  // Not a school run at all: a public AT service that happens to call at the bay on its
+  // way to Constellation, so it turns up in its own bus rather than borrowing a yellow one.
+  { n:'871', dest:'Constellation', sub:'Forrest Hill Road', w:2, ev:true }
 ];
 const TEX_ROUTE = {};
-for (const r of SCHOOL_ROUTES) TEX_ROUTE[r.n] = ledTexture(r.n, r.dest);
+for (const r of SCHOOL_ROUTES)
+  TEX_ROUTE[r.n] = r.ev ? ledTextureEV(r.dest, r.sub, r.n) : ledTexture(r.n, r.dest);
 function pickSchoolRoute(){
   let total=0; for (const r of SCHOOL_ROUTES) total += r.w;
   let k = Math.random()*total;
@@ -1360,6 +1389,57 @@ function buildDriver(){
   return b.build();
 }
 
+/* Who is already aboard, who gets which seat and where the crush forms.  This is the
+   boarding contract, not decoration — seat order, base load and the player's standing
+   spot all come out of here — so every single-decker shares it rather than keeping a
+   copy that can drift. */
+function fitOutSingleDeck(group, interior){
+  // ---- occupants, in the exact order people take them ----
+  // 10 seats are already taken when it pulls in; the 10 free ones are the front pairs:
+  // first five aboard get a window, next five the aisle seat, everyone after that stands.
+  const allPairs = interior.pairs.slice().sort((a,b)=> b.x - a.x);   // front of the bus first
+  const freePairs = allPairs.slice(0,5), takenPairs = allPairs.slice(5);
+  const seatOrder = [];
+  for (const p of takenPairs){ seatOrder.push(p.window, p.aisle); }  // already occupied
+  for (const p of freePairs)   seatOrder.push(p.window);             // boarders 1-5
+  for (const p of freePairs)   seatOrder.push(p.aisle);              // boarders 6-10
+  const baseLoad = takenPairs.length * 2;
+  const occupants = [];
+  for (const s of seatOrder){
+    const m = new THREE.Mesh(buildSeated(), studentMat);
+    m.position.set(s.x, s.y + 0.625, s.z);
+    m.rotation.y = Math.PI/2;
+    m.visible=false;
+    m.userData = { seat:true, kind:s.kind, taken:false,
+                   pose:{ x:s.x, y:s.y + 1.22, z:s.z } };
+    group.add(m); occupants.push(m);
+  }
+  // Standing room.  All 20 seats are down the back, so the whole front of the bus is the
+  // standing bay — and that is where a full bus actually packs.  Fill outwards from just
+  // inside the doors so the crush forms around you, then run back down the aisle.
+  const RIDE_X = 1.94, RIDE_Z = -0.02;          // where the player ends up standing
+  const DOOR_IN = [1.50, -0.55];                // just inside the door well
+  const stand = [];
+  // two ranks either side of the aisle: packed shoulders, but you can still see down the bus
+  for (const x of [3.04,2.49,1.94,1.39,0.84,0.29,-0.26])
+    for (const z of [-0.70,0.66]) stand.push([x,z]);
+  stand.push([0.29,-0.02],[-0.26,-0.02]);        // a couple down the middle, well clear of you
+  stand.sort((a,b)=> Math.hypot(a[0]-DOOR_IN[0],a[1]-DOOR_IN[1])
+                   - Math.hypot(b[0]-DOOR_IN[0],b[1]-DOOR_IN[1]));
+  let flip = 0;                                  // the rest trail off down the aisle
+  for (let x=-0.94; x>=-5.80; x-=0.46) stand.push([x, (flip++%2) ? 0.10 : -0.10]);
+  for (const s of stand){
+    if (Math.hypot(s[0]-RIDE_X, s[1]-RIDE_Z) < 1.05) continue;   // leave yourself somewhere to stand
+    const m=new THREE.Mesh(buildStanding(), studentMat);
+    m.position.set(s[0], 1.07, s[1]);
+    m.rotation.y = Math.PI/2 + (Math.random()<0.22 ? rand(-2.4,2.4) : rand(-0.55,0.55));
+    m.scale.setScalar(rand(0.93,1.07));
+    m.visible=false; m.userData = { seat:false, kind:'stand', taken:false };
+    group.add(m); occupants.push(m);
+  }
+  return { occupants, baseLoad, RIDE_X, RIDE_Z };
+}
+
 function makeBus(){
   const group = new THREE.Group();
   const ext = new THREE.Mesh(buildBusExterior(), VMAT());
@@ -1422,49 +1502,9 @@ function makeBus(){
   const doorA = leaf( 1); doorA.position.set(0.78, 0, -BUS_HW-0.04);
   const doorB = leaf(-1); doorB.position.set(2.22, 0, -BUS_HW-0.04);
 
-  // ---- occupants, in the exact order people take them ----
-  // 10 seats are already taken when it pulls in; the 10 free ones are the front pairs:
-  // first five aboard get a window, next five the aisle seat, everyone after that stands.
-  const allPairs = interior.pairs.slice().sort((a,b)=> b.x - a.x);   // front of the bus first
-  const freePairs = allPairs.slice(0,5), takenPairs = allPairs.slice(5);
-  const seatOrder = [];
-  for (const p of takenPairs){ seatOrder.push(p.window, p.aisle); }  // already occupied
-  for (const p of freePairs)   seatOrder.push(p.window);             // boarders 1-5
-  for (const p of freePairs)   seatOrder.push(p.aisle);              // boarders 6-10
-  const BASE_LOAD = takenPairs.length * 2;
-  const occupants = [];
-  for (const s of seatOrder){
-    const m = new THREE.Mesh(buildSeated(), studentMat);
-    m.position.set(s.x, s.y + 0.625, s.z);
-    m.rotation.y = Math.PI/2;
-    m.visible=false;
-    m.userData = { seat:true, kind:s.kind, taken:false,
-                   pose:{ x:s.x, y:s.y + 1.22, z:s.z } };
-    group.add(m); occupants.push(m);
-  }
-  // Standing room.  All 20 seats are down the back, so the whole front of the bus is the
-  // standing bay — and that is where a full bus actually packs.  Fill outwards from just
-  // inside the doors so the crush forms around you, then run back down the aisle.
-  const RIDE_X = 1.94, RIDE_Z = -0.02;          // where the player ends up standing
-  const DOOR_IN = [1.50, -0.55];                // just inside the door well
-  const stand = [];
-  // two ranks either side of the aisle: packed shoulders, but you can still see down the bus
-  for (const x of [3.04,2.49,1.94,1.39,0.84,0.29,-0.26])
-    for (const z of [-0.70,0.66]) stand.push([x,z]);
-  stand.push([0.29,-0.02],[-0.26,-0.02]);        // a couple down the middle, well clear of you
-  stand.sort((a,b)=> Math.hypot(a[0]-DOOR_IN[0],a[1]-DOOR_IN[1])
-                   - Math.hypot(b[0]-DOOR_IN[0],b[1]-DOOR_IN[1]));
-  let flip = 0;                                  // the rest trail off down the aisle
-  for (let x=-0.94; x>=-5.80; x-=0.46) stand.push([x, (flip++%2) ? 0.10 : -0.10]);
-  for (const s of stand){
-    if (Math.hypot(s[0]-RIDE_X, s[1]-RIDE_Z) < 1.05) continue;   // leave yourself somewhere to stand
-    const m=new THREE.Mesh(buildStanding(), studentMat);
-    m.position.set(s[0], 1.07, s[1]);
-    m.rotation.y = Math.PI/2 + (Math.random()<0.22 ? rand(-2.4,2.4) : rand(-0.55,0.55));
-    m.scale.setScalar(rand(0.93,1.07));
-    m.visible=false; m.userData = { seat:false, kind:'stand', taken:false };
-    group.add(m); occupants.push(m);
-  }
+  const FIT = fitOutSingleDeck(group, interior);
+  const occupants = FIT.occupants, BASE_LOAD = FIT.baseLoad;
+  const RIDE_X = FIT.RIDE_X, RIDE_Z = FIT.RIDE_Z;
   // soft cabin lighting so the interior reads from inside and through the glass
   for (const lx of [3.4, 0.2, -3.2]){
     const pl = new THREE.PointLight(0xfff1d8, 0.62, 7.5, 2);
@@ -1507,21 +1547,34 @@ function makeBus(){
 /* ============================================================
    5b.  THE NX2 DOUBLE-DECKER  (one bus in five)
    ============================================================ */
-const GOLD = 0xe8a91d, GOLD_D = 0xc98c12, NAVY2 = 0x1b2740;
+const GOLD = 0xe8a91d, NAVY2 = 0x1b2740;
 
+/* The blind: a white route header over an amber dot-matrix, with the route
+   number kept in its own column on the right.  Everything is measured with
+   fitFont because Segoe is not there on most machines and the fallback runs
+   wide enough to walk "Albany Station" straight into the NX2. */
 function ledTextureNX2(){
-  const c=document.createElement('canvas'); c.width=512; c.height=160;
+  const c=document.createElement('canvas'); c.width=768; c.height=232;
   const g=c.getContext('2d');
-  g.fillStyle='#05060a'; g.fillRect(0,0,512,160);
-  g.fillStyle='#f0f0ea'; g.font='bold 30px "Segoe UI",sans-serif'; g.textAlign='center';
-  g.fillText('Northern Express', 256, 36);
-  g.fillStyle='#ffb223'; g.textAlign='left';
-  g.font='bold 52px "Segoe UI",sans-serif'; g.fillText('Albany Station', 12, 100);
-  g.font='bold 34px "Segoe UI",sans-serif'; g.fillText('Via Busway Stations', 12, 142);
-  g.textAlign='right'; g.font='bold 74px "Segoe UI",sans-serif'; g.fillText('NX2', 505, 128);
+  const F='"Segoe UI",Arial,sans-serif';
+  g.fillStyle='#05060a'; g.fillRect(0,0,768,232);
+  g.textBaseline='alphabetic';
+  g.fillStyle='#f2f2ec'; g.textAlign='center';
+  g.font='bold '+fitFont(g,'Northern Express',660,42,'bold',F)+'px '+F;
+  g.fillText('Northern Express', 384, 44);
+  g.fillStyle='#171b23'; g.fillRect(0,58,768,5);
+  const COL = 512;                                   // where the route number starts
+  g.fillStyle='#ffc733'; g.textAlign='left';
+  g.font='bold '+fitFont(g,'Albany Station',COL-34,92,'bold',F)+'px '+F;
+  g.fillText('Albany Station', 16, 148);
+  g.font='bold '+fitFont(g,'Via Busway Stations',COL-34,52,'bold',F)+'px '+F;
+  g.fillText('Via Busway Stations', 16, 204);
+  g.textAlign='right';
+  g.font='bold '+fitFont(g,'NX2',768-COL-18,116,'bold',F)+'px '+F;
+  g.fillText('NX2', 752, 178);
   g.globalCompositeOperation='destination-out'; g.fillStyle='#000';
-  for (let y=48;y<160;y+=4) g.fillRect(0,y+2,512,2);
-  for (let x=0;x<512;x+=4) g.fillRect(x+2,48,2,112);
+  for (let y=68;y<232;y+=4) g.fillRect(0,y+3,768,1);
+  for (let x=0;x<768;x+=4) g.fillRect(x+3,68,1,164);
   g.globalCompositeOperation='source-over';
   return new THREE.CanvasTexture(c);
 }
@@ -1537,87 +1590,142 @@ function wordTexture(txt, size, color){
 const TEX_NX2   = ledTextureNX2();
 const TEX_NE    = wordTexture('Northern Express', 88);
 const TEX_FLEET = wordTexture('TR3553', 64, '#c9cfd8');
+const TEX_FLEETF= wordTexture('TR3553', 82, '#eef2f7');
+const TEX_BCI   = wordTexture('BCI', 74, '#c2cad4');
 const TEX_PLATE2= plateTexture('LQF478', '#f2f2ee', '#15181d', false);
+/* The real thing's glass is nearly black and the two decks read as one ribbon,
+   so the NX2 gets its own darker glazing rather than the school buses'. */
+const ddGlassMat  = new THREE.MeshLambertMaterial({color:0x090d14, transparent:true, opacity:0.70,
+                                                   side:THREE.DoubleSide, depthWrite:false});
+const ddScreenMat = new THREE.MeshLambertMaterial({color:0x101724, transparent:true, opacity:0.38,
+                                                   side:THREE.DoubleSide, depthWrite:false});
+/* The mask amber and the skirt grey are the NX2's own — the school buses keep theirs. */
+const MASK = 0xf5c026, MASK_D = 0xcc9a12, SKIRTC = 0x9aa1a9, SKIRTC_D = 0x7b828a;
 
-/* deck heights — a real double-decker: low saloon floor, ~1.9m downstairs, ~1.65m up */
+/* deck heights — a real double-decker: low saloon floor, ~1.9m downstairs, ~1.65m up.
+   The glazing bands are set deep and the strip between them thin, because on the real
+   NX2 the two decks read as one dark ribbon down the side. */
 const DDG = {
   HL: 6.30, HW: BUS_HW,
-  SKIRT_T: 1.12,          // top of the silver skirt
-  LOW_W0: 1.30, LOW_W1: 2.20,   // lower window band
-  DECK0: 2.32, DECK1: 2.50,     // deck sandwich
-  UP_W0: 3.02, UP_W1: 4.00,     // upper window band
+  BODY_B: 0.30,                 // bottom edge of the bodywork
+  SKIRT_T: 0.86,                // top of the grey skirt — about wheel-centre height
+  LOW_W0: 1.24, LOW_W1: 2.34,   // lower window band
+  DECK0: 2.34, DECK1: 2.86,     // the thin body-colour strip between the decks
+  UP_W0: 2.86, UP_W1: 4.06,     // upper window band
   ROOF: 4.30,
   LF: 0.42, LC: 2.30,           // lower saloon floor / ceiling  (1.88m headroom)
   UF: 2.52, UC: 4.18            // upper deck floor / ceiling    (1.66m headroom)
 };
+/* front elevation, bottom up: amber valance, navy panel, lower screen, navy
+   fascia, upper screen, amber brow.  All of it sits on one amber plate. */
+const DDF = { BUMP0:0.30, BUMP1:0.88, PAN0:0.88, PAN1:1.42,
+              LSC0:1.42, LSC1:2.50, FAS0:2.50, FAS1:2.86,
+              USC0:2.86, USC1:4.06, BLIND_Y:3.14, BLIND_H:0.52 };
 
 function buildDDExterior(){
   const b=new Builder();
-  const {HL,HW,SKIRT_T,LOW_W0,LOW_W1,DECK0,DECK1,UP_W0,UP_W1,ROOF} = DDG;
+  const {HL,HW,BODY_B,SKIRT_T,LOW_W0,LOW_W1,DECK0,DECK1,UP_W0,UP_W1,ROOF} = DDG;
+  const MW = HW*2, FX = HL;
+  const BLK = 0x0b0e14;                       // window rubber and glazing recesses
+  const ROOFW = 0xdfe3e7, ROOFW_T = 0xeef1f4;
 
-  // ---- roof ----
-  b.box(HL*2, 0.14, HW*2, NAVY2, 0, ROOF, 0);
-  b.box(HL*1.7, 0.10, HW*1.55, 0xc9ced6, -0.5, ROOF+0.09, 0);
-  // ---- deck sandwich band ----
-  b.box(HL*2, DECK1-DECK0, HW*2+0.02, NAVY2, 0, (DECK0+DECK1)/2, 0);
+  // ---- roof: white, and proud of the sides so it caps the body ----
+  b.box(HL*2+0.04, 0.16, MW+0.06, ROOFW,   0,   ROOF+0.08, 0);
+  b.box(HL*1.62,   0.08, MW*0.72, ROOFW_T, -0.6, ROOF+0.19, 0);
+  // ---- the strip between the decks ----
+  b.box(HL*2, DECK1-DECK0, MW+0.03, NAVY2, 0, (DECK0+DECK1)/2, 0);
   // ---- rear ----
-  b.box(0.12, ROOF-SKIRT_T, HW*2, NAVY2, -HL, (SKIRT_T+ROOF)/2, 0);
-  b.box(0.12, SKIRT_T-0.42, HW*2, SILVER, -HL, (0.42+SKIRT_T)/2, 0);
-  b.box(0.10, 0.26, 0.42, 0x8b1f24, -HL-0.04, 1.30,  0.86);
-  b.box(0.10, 0.26, 0.42, 0x8b1f24, -HL-0.04, 1.30, -0.86);
-  // ---- front: gold cap, two windscreens, LED between them ----
-  b.box(0.14, 0.34, HW*2+0.10, GOLD, HL+0.01, ROOF-0.10, 0);
-  b.box(0.16, ROOF-0.30, 0.16, GOLD, HL+0.02, (0.6+ROOF)/2,  HW+0.03);
-  b.box(0.16, ROOF-0.30, 0.16, GOLD, HL+0.02, (0.6+ROOF)/2, -HW-0.03);
-  b.box(0.13, UP_W0-DECK1, HW*2-0.2, 0x11151d, HL, (DECK1+UP_W0)/2, 0);   // LED housing
-  b.box(0.13, DECK0-LOW_W1, HW*2-0.2, NAVY2, HL, (LOW_W1+DECK0)/2, 0);
-  b.box(0.15, LOW_W0-SKIRT_T, HW*2, NAVY2, HL, (SKIRT_T+LOW_W0)/2, 0);
-  b.box(0.20, SKIRT_T-0.62, HW*2+0.02, NAVY2, HL+0.02, (0.62+SKIRT_T)/2, 0);
-  b.box(0.24, 0.30, HW*2+0.04, GOLD, HL+0.04, 0.47, 0);                    // gold valance
-  b.box(0.30, 0.16, 0.72, GOLD_D, HL+0.06, 0.63,  0.80);
-  b.box(0.30, 0.16, 0.72, GOLD_D, HL+0.06, 0.63, -0.80);
-  b.box(0.12, 0.20, 0.40, 0xfff3d4, HL+0.14, 0.50,  0.96);
-  b.box(0.12, 0.20, 0.40, 0xfff3d4, HL+0.14, 0.50, -0.96);
-  b.box(0.10, 0.13, 0.28, 0xffb35c, HL+0.14, 0.30,  0.96);
-  b.box(0.10, 0.13, 0.28, 0xffb35c, HL+0.14, 0.30, -0.96);
-  // mirrors
-  b.cyl(0.035,0.035,1.0,6, 0x1b1e24, HL-0.30, 3.30, -HW-0.24, 0,0,0.22);
-  b.box(0.09,0.50,0.26, 0x1b1e24, HL-0.46, 2.86, -HW-0.42);
-  b.cyl(0.035,0.035,1.0,6, 0x1b1e24, HL-0.30, 3.30,  HW+0.24, 0,0,-0.22);
-  b.box(0.09,0.50,0.26, 0x1b1e24, HL-0.46, 2.86,  HW+0.42);
+  b.box(0.12, ROOF-SKIRT_T,   MW, NAVY2,    -HL, (SKIRT_T+ROOF)/2, 0);
+  b.box(0.12, SKIRT_T-BODY_B, MW, SKIRTC,   -HL, (BODY_B+SKIRT_T)/2, 0);
+  b.box(0.13, 0.06, MW,           SKIRTC_D, -HL, SKIRT_T, 0);
+  b.box(0.09, LOW_W1-LOW_W0, 2.04, BLK, -HL-0.035, (LOW_W0+LOW_W1)/2, 0);
+  b.box(0.09, UP_W1-UP_W0,   2.04, BLK, -HL-0.035, (UP_W0+UP_W1)/2, 0);
+  b.box(0.10, 0.26, 0.42, 0x8b1f24, -HL-0.06, 1.10,  0.86);
+  b.box(0.10, 0.26, 0.42, 0x8b1f24, -HL-0.06, 1.10, -0.86);
+
+  // ---- front ----
+  // The mask is a frame, not a plate: a full sheet of amber would be visible from
+  // inside through the front side windows, and it shows up as a gold slab.
+  const F = DDF, IN = 0.22;
+  for (const sz of [1,-1])
+    b.box(0.14, (ROOF+0.02)-F.BUMP1, 0.26, MASK, FX+0.05, ((ROOF+0.02)+F.BUMP1)/2, sz*(HW-0.12));
+  b.box(0.14, (ROOF+0.02)-F.USC1, MW, MASK, FX+0.05, ((ROOF+0.02)+F.USC1)/2, 0);   // brow
+  // dark liners behind the frame — from the front seat up top you look at the inside
+  // of the mask, and bare amber up there lights the cabin like a hi-vis vest
+  for (const sz of [1,-1])
+    b.box(0.08, (ROOF+0.02)-F.BUMP1, 0.26, 0x161c26, FX-0.05, ((ROOF+0.02)+F.BUMP1)/2, sz*(HW-0.12));
+  b.box(0.08, (ROOF+0.02)-F.USC1, MW, 0x161c26, FX-0.05, ((ROOF+0.02)+F.USC1)/2, 0);
+  function panel(y0,y1,col){
+    b.box(0.12, y1-y0, MW-2*IN, col, FX+0.02, (y0+y1)/2, 0);
+  }
+  panel(F.FAS0, F.FAS1, NAVY2);                      // fascia between the screens
+  panel(F.PAN0, F.PAN1, NAVY2);                      // fleet number / BCI / AT Metro
+  // the two screens stay open apertures with a rubber at top and bottom — fill them
+  // in and you lose the driver, the front row, and every face behind the glass
+  for (const y of [F.USC0+0.035, F.USC1-0.035, F.LSC0+0.035, F.LSC1-0.035])
+    b.box(0.12, 0.07, MW-2*IN, BLK, FX+0.02, y, 0);
+  // the blind box sits proud of the screen, so the gaps between its dots stay black
+  b.box(0.06, F.BLIND_H+0.06, 2.18, 0x05060a, FX+0.115, F.BLIND_Y, 0);
+  // amber valance and its lower lip
+  b.box(0.24, F.BUMP1-F.BUMP0, MW+0.06, MASK,   FX+0.06, (F.BUMP0+F.BUMP1)/2, 0);
+  b.box(0.26, 0.09, MW+0.07,             MASK_D, FX+0.07, F.BUMP0+0.02, 0);
+  // headlamps sunk into the valance, indicator below
+  for (const sz of [1,-1]){
+    b.box(0.09, 0.28, 0.60, 0x15181e, FX+0.145, 0.63, sz*0.86);
+    b.cyl(0.105,0.105,0.07,12, 0xfff3d4, FX+0.20, 0.66, sz*0.99, 0,0,Math.PI/2);
+    b.cyl(0.075,0.075,0.07,12, 0xffd79a, FX+0.20, 0.66, sz*0.73, 0,0,Math.PI/2);
+    b.box(0.08, 0.11, 0.28, 0xffb35c, FX+0.175, 0.42, sz*1.00);
+  }
+  // the amber wraps a little way round each front corner
+  for (const sz of [1,-1])
+    b.box(0.18, (ROOF-0.06)-F.BUMP0, 0.10, MASK, FX-0.11, ((ROOF-0.06)+F.BUMP0)/2, sz*(HW+0.005));
+  // wipers parked low across the lower screen, both raked the same way
+  for (const sz of [1,-1]){
+    b.box(0.05,0.05,0.94, 0x15171b, FX+0.11, 1.82, sz*0.50, 0.72);
+    b.box(0.06,0.16,0.07, 0x15171b, FX+0.11, 1.64, sz*0.50);
+  }
+  // mirrors: big black heads out on stalks, level with the deck band
+  for (const sz of [1,-1]){
+    b.cyl(0.04,0.04,0.66,6, 0x1b1e24, FX-0.12, 3.06, sz*(HW+0.24), 0,0,-sz*0.34);
+    b.box(0.10,0.64,0.30, 0x1b1e24, FX-0.28, 2.74, sz*(HW+0.44));
+    b.box(0.03,0.52,0.22, 0x3a4049, FX-0.34, 2.74, sz*(HW+0.44));
+  }
 
   // ---- flanks ----
   function flank(z, hasDoor){
     const segs = hasDoor ? [[-HL, 0.78],[2.22, HL]] : [[-HL, HL]];
     for (const s of segs){
       const w=s[1]-s[0], cx=(s[0]+s[1])/2;
-      b.box(w, SKIRT_T-0.42, 0.09, SILVER, cx, (0.42+SKIRT_T)/2, z);
-      b.box(w, 0.10, 0.11, SILVER_D, cx, 0.46, z);
-      b.box(w, LOW_W0-SKIRT_T, 0.09, NAVY2, cx, (SKIRT_T+LOW_W0)/2, z);
-      b.box(w, DECK0-LOW_W1, 0.09, NAVY2, cx, (LOW_W1+DECK0)/2, z);
+      b.box(w, SKIRT_T-BODY_B, 0.09, SKIRTC,   cx, (BODY_B+SKIRT_T)/2, z);
+      b.box(w, 0.06, 0.11,           SKIRTC_D, cx, SKIRT_T, z);
+      b.box(w, LOW_W0-SKIRT_T, 0.09, NAVY2,    cx, (SKIRT_T+LOW_W0)/2, z);
     }
-    b.box(HL*2, UP_W0-DECK1, 0.09, NAVY2, 0, (DECK1+UP_W0)/2, z);
     b.box(HL*2, ROOF-UP_W1, 0.09, NAVY2, 0, (UP_W1+ROOF)/2, z);
+    // black rubbers top and bottom of each band — this is what makes the two decks
+    // read as one continuous ribbon from any distance
+    for (const y of [LOW_W0+0.025, LOW_W1-0.025, UP_W0+0.025, UP_W1-0.025])
+      b.box(HL*2, 0.05, 0.11, BLK, 0, y, z);
     const pil=[-6.30,-4.70,-3.10,-1.50,0.10,0.78,2.22,3.70,5.10,6.30];
     for (const px of pil){
-      b.box(0.13, LOW_W1-LOW_W0, 0.10, NAVY2, px, (LOW_W0+LOW_W1)/2, z);
-      b.box(0.13, UP_W1-UP_W0,  0.10, NAVY2, px, (UP_W0+UP_W1)/2, z);
+      b.box(0.11, LOW_W1-LOW_W0, 0.10, BLK, px, (LOW_W0+LOW_W1)/2, z);
+      b.box(0.11, UP_W1-UP_W0,   0.10, BLK, px, (UP_W0+UP_W1)/2, z);
     }
     if (hasDoor){
-      b.box(0.10, 2.06, 0.14, NAVY_D, 0.78, 1.33, z);
-      b.box(0.10, 2.06, 0.14, NAVY_D, 2.22, 1.33, z);
-      b.box(1.54, 0.14, 0.14, NAVY_D, 1.50, 2.36, z);
-      b.box(1.54, 0.10, 0.10, GOLD,   1.50, 0.34, z-0.02);
+      b.box(0.10, 2.06, 0.14, 0x141a24, 0.78, 1.33, z);
+      b.box(0.10, 2.06, 0.14, 0x141a24, 2.22, 1.33, z);
+      b.box(1.54, 0.14, 0.14, 0x141a24, 1.50, 2.36, z);
+      b.box(1.54, 0.10, 0.10, GOLD,     1.50, 0.34, z-0.02);
     }
   }
   flank(-HW, true);
   flank( HW, false);
 
-  // ---- wheels ----
+  // ---- wheels: three axles, two of them at the back ----
   for (const wx of [4.40, -2.70, -4.10]){
     for (const wz of [-1.18, 1.18]){
       b.cyl(0.54,0.54,0.30,14, 0x15171b, wx, 0.54, wz, Math.PI/2,0,0);
-      b.cyl(0.27,0.27,0.33,10, 0xa8adb4, wx, 0.54, wz, Math.PI/2,0,0);
+      b.cyl(0.28,0.28,0.33,10, 0xa8adb4, wx, 0.54, wz, Math.PI/2,0,0);
+      b.cyl(0.10,0.10,0.36,8,  0x8b9098, wx, 0.54, wz, Math.PI/2,0,0);
     }
   }
   b.box(4.8,0.26,2.2, 0x23272d, -3.4, 0.30, 0);
@@ -1710,11 +1818,12 @@ function makeBusDouble(){
   const intMesh = new THREE.Mesh(I.geo, VMAT({side:THREE.DoubleSide}));
   intMesh.receiveShadow=true; group.add(intMesh);
 
-  const {HL,HW,LOW_W0,LOW_W1,UP_W0,UP_W1,DECK1,LF,UF} = DDG;
+  const {HL,HW,LOW_W0,LOW_W1,UP_W0,UP_W1,DECK0,DECK1,LF,UF} = DDG;
   const LOWY=(LOW_W0+LOW_W1)/2, LOWH=LOW_W1-LOW_W0;
   const UPY=(UP_W0+UP_W1)/2,    UPH=UP_W1-UP_W0;
+  const BANDY=(DECK0+DECK1)/2, MW=HW*2, F=DDF;
   function glass(w,h,x,y,z,ry,mat){
-    const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h), mat||glassMat);
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h), mat||ddGlassMat);
     m.position.set(x,y,z); m.rotation.y=ry||0; group.add(m); return m;
   }
   const lowSegsDoor=[[-6.23,-4.77],[-4.63,-3.17],[-3.03,-1.57],[-1.43,0.03],[2.29,3.63],[3.77,5.03],[5.17,6.23]];
@@ -1723,24 +1832,29 @@ function makeBusDouble(){
   for (const r of offSegs)     glass(r[1]-r[0],LOWH,(r[0]+r[1])/2,LOWY, HW+0.005,0);
   for (const r of offSegs){ glass(r[1]-r[0],UPH,(r[0]+r[1])/2,UPY,-HW-0.005,0);
                             glass(r[1]-r[0],UPH,(r[0]+r[1])/2,UPY, HW+0.005,0); }
-  glass(2.32,1.00, HL+0.09, 1.72, 0, Math.PI/2, windshieldMat);   // driver screen
-  glass(2.40,1.28, HL+0.09, 3.48, 0, Math.PI/2, windshieldMat);   // the panorama
-  glass(1.90,0.86,-HL-0.08, 1.72, 0, Math.PI/2, windshieldMat);
-  glass(1.90,0.90,-HL-0.08, 3.48, 0, Math.PI/2, windshieldMat);
+  glass(MW-0.48, F.LSC1-F.LSC0-0.06,  HL+0.09, (F.LSC0+F.LSC1)/2, 0, Math.PI/2, ddScreenMat);
+  glass(MW-0.48, F.USC1-F.USC0-0.06,  HL+0.09, (F.USC0+F.USC1)/2, 0, Math.PI/2, ddScreenMat);
+  glass(1.94,LOWH-0.10,-HL-0.09, LOWY, 0, Math.PI/2, ddScreenMat);
+  glass(1.94,UPH-0.12, -HL-0.09, UPY,  0, Math.PI/2, ddScreenMat);
 
   function decal(tex,w,h,x,y,z,ry){
     const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h), new THREE.MeshBasicMaterial({map:tex,transparent:true}));
     m.position.set(x,y,z); m.rotation.y=ry||0; group.add(m); return m;
   }
-  const LEDY=(DECK1+UP_W0)/2;
-  decal(TEX_NX2,   2.10,0.50, HL+0.09, LEDY, 0, Math.PI/2);
-  decal(TEX_PLATE2,0.74,0.25, HL+0.19, 0.30, 0, Math.PI/2);
-  decal(TEX_AT,    1.55,0.39, HL+0.14, 0.92, 0, Math.PI/2);
-  decal(TEX_AT,    1.90,0.48, -3.55, DECK1+0.22, -HW-0.06, Math.PI);
-  decal(TEX_NE,    2.60,0.41,  0.60, DECK1+0.20, -HW-0.06, Math.PI);
-  decal(TEX_FLEET, 1.00,0.16,  3.20, 1.02, -HW-0.06, Math.PI);
-  decal(TEX_AT,    1.90,0.48, -3.55, DECK1+0.22,  HW+0.06, 0);
-  decal(TEX_NE,    2.60,0.41,  0.60, DECK1+0.20,  HW+0.06, 0);
+  // front. Texture +X maps to world -Z here, so anything laid on the front reads
+  // the right way round with the kerb side on the viewer's left, as in the photo.
+  decal(TEX_NX2,   2.12,F.BLIND_H, HL+0.155, F.BLIND_Y, 0, Math.PI/2);
+  decal(TEX_FLEETF,0.96,0.15, HL+0.11, 1.31, -0.62, Math.PI/2);
+  decal(TEX_BCI,   0.42,0.13, HL+0.11, 1.31,  0.34, Math.PI/2);
+  decal(TEX_AT,    1.30,0.33, HL+0.11, 1.05, 0, Math.PI/2);
+  decal(TEX_PLATE2,0.74,0.25, HL+0.21, 0.52, 0, Math.PI/2);
+  // sides: Northern Express forward of the roundel, both in the band between decks
+  decal(TEX_AT,    1.70,0.43, -3.55, BANDY, -HW-0.06, Math.PI);
+  decal(TEX_NE,    2.50,0.39,  0.60, BANDY, -HW-0.06, Math.PI);
+  decal(TEX_FLEET, 1.00,0.16,  3.20, 1.05, -HW-0.06, Math.PI);
+  decal(TEX_AT,    1.70,0.43, -3.55, BANDY,  HW+0.06, 0);
+  decal(TEX_NE,    2.50,0.39,  0.60, BANDY,  HW+0.06, 0);
+  decal(TEX_FLEET, 1.00,0.16,  3.20, 1.05,  HW+0.06, 0);
 
   // ---- doors ----
   function leaf(dirX){
@@ -1757,7 +1871,7 @@ function makeBusDouble(){
   const doorA=leaf( 1); doorA.position.set(0.78,0,-HW-0.04);
   const doorB=leaf(-1); doorB.position.set(2.22,0,-HW-0.04);
 
-  for (const lx of [3.4, 0.2, -3.2]){
+  for (const lx of [4.7, 0.6, -3.2]){
     const pl=new THREE.PointLight(0xfff1d8, 0.5, 7.5, 2); pl.position.set(lx, LF+1.55, 0); group.add(pl);
     const pu=new THREE.PointLight(0xfff1d8, 0.5, 7.5, 2); pu.position.set(lx, UF+1.35, 0); group.add(pu);
   }
@@ -1818,6 +1932,296 @@ function makeBusDouble(){
     setLoad(){ this.fill(this.baseLoad); },
     releaseSeats(){ for (const o of this.occupants) o.userData.taken=false; },
     setFront(){}, clearFront(){}
+  };
+}
+
+
+/* ============================================================
+   5b-ii.  THE 871  —  AT's battery-electric single-decker
+   ============================================================ */
+/* Two-tone: silver-grey below the waist, near-black navy above the glass, with a
+   patterned band riding the split.  The glazing is the thing that makes it read as
+   this bus rather than a yellow one — windows, pillars and rubbers all the same
+   black, so the whole flank is one ribbon. */
+const EV_NAVY = 0x212b49, EV_NAVY_D = 0x18203a;
+const EV_SIL  = 0xa6adb6;
+const EV_BLK  = 0x0a0c12;
+
+const EVG = {
+  HL: BUS_HL, HW: BUS_HW,
+  BODY_B: 0.24,                 // bottom edge of the bodywork
+  SPLIT:  1.46, BAND_H: 0.19,   // where silver gives way to the band, and how deep it is
+  WIN0:   1.80, WIN1: 2.92,     // the black glazing ribbon
+  ROOF:   3.32
+};
+/* front elevation, bottom up: silver bumper, navy panel, screen aperture, navy brow */
+const EVF = { B0:0.24, B1:1.14, P1:1.70, S1:3.06, BLIND_Y:2.74, BLIND_H:0.46 };
+
+/* The waistline band: a chevron repeat rather than a real koru, because at the size
+   it renders here anything finer turns to mush.  Takes the run in metres so the flank
+   and the back get the same chevron pitch rather than the same tile count. */
+const EV_BAND_PITCH = 0.564;                 // metres per tile of the texture
+function evBandTexture(metres){
+  const c=document.createElement('canvas'); c.width=128; c.height=32;
+  const g=c.getContext('2d');
+  g.fillStyle='#141c2e'; g.fillRect(0,0,128,32);
+  g.strokeStyle='#c3cee2'; g.lineWidth=4; g.lineCap='round'; g.lineJoin='round';
+  for (let i=0;i<2;i++){
+    const x=i*64;
+    g.beginPath(); g.moveTo(x+6,26);  g.lineTo(x+32,6);  g.lineTo(x+58,26); g.stroke();
+    g.beginPath(); g.moveTo(x+14,29); g.lineTo(x+32,17); g.lineTo(x+50,29); g.stroke();
+  }
+  const t=new THREE.CanvasTexture(c);
+  t.wrapS=THREE.RepeatWrapping; t.repeat.x = metres / EV_BAND_PITCH;
+  return t;
+}
+/* The roundel, not the AT Metro wordmark — on this bus it is a metre across and
+   sits on the rear panel on its own. */
+function atRoundelTexture(){
+  const c=document.createElement('canvas'); c.width=256; c.height=256;
+  const g=c.getContext('2d');
+  g.clearRect(0,0,256,256);
+  g.strokeStyle='#ffffff'; g.lineWidth=15;
+  g.beginPath(); g.arc(128,128,112,0,6.2832); g.stroke();
+  g.fillStyle='#ffffff'; g.textAlign='center'; g.textBaseline='middle';
+  g.font='900 128px "Segoe UI",Arial,sans-serif';
+  g.fillText('AT', 128, 136);
+  g.save();                                    // the stroke that cuts the A from the T
+  g.translate(128,136); g.rotate(-0.42);
+  g.fillStyle='#ffffff'; g.fillRect(-4,-64,8,128);
+  g.restore();
+  return new THREE.CanvasTexture(c);
+}
+const TEX_EV_BAND   = evBandTexture(BUS_HL*2);
+const TEX_EV_BAND_R = evBandTexture(BUS_HW*2);
+const TEX_EV_ROUND  = atRoundelTexture();
+const TEX_EV_FLEETF = wordTexture('NB5944', 74, '#e8edf5');
+const TEX_EV_FLEETS = wordTexture('NB5944', 64, '#2b3550');
+const TEX_EV_PLATE  = plateTexture('REW986', '#f2f2ee', '#15181d', false);
+/* Nearly black glass, like the real thing — the school buses keep their lighter pane. */
+const evGlassMat  = new THREE.MeshLambertMaterial({color:0x080b12, transparent:true, opacity:0.72,
+                                                   side:THREE.DoubleSide, depthWrite:false});
+const evScreenMat = new THREE.MeshLambertMaterial({color:0x101724, transparent:true, opacity:0.36,
+                                                   side:THREE.DoubleSide, depthWrite:false});
+
+const EV_PIL  = [-6.20,-4.66,-3.12,-1.58,-0.04,0.78,2.22,3.62,4.96,6.20];
+const EV_AXLE = [4.35, -2.92, -4.30];
+
+function buildEVExterior(){
+  const b=new Builder();
+  const {HL,HW,BODY_B,SPLIT,BAND_H,WIN0,WIN1,ROOF} = EVG;
+  const F = EVF, MW = HW*2, FX = HL, BLK = EV_BLK, IN = 0.24;
+
+  // ---- roof, with the battery pack it carries instead of a tank ----
+  b.box(HL*2, 0.14, MW, EV_NAVY, 0, ROOF+0.07, 0);
+  b.box(HL*1.22, 0.20, MW*0.62, EV_NAVY_D, -1.40, ROOF+0.22, 0);
+  b.box(1.90, 0.24, MW*0.46, 0x2b3348, 3.60, ROOF+0.24, 0);       // cooling pack over the cab
+  // the roof rolls over into the screen rather than meeting it at a corner
+  b.box(0.54, 0.14, MW-0.10, EV_NAVY, FX-0.10, ROOF+0.01, 0, 0,0, -0.60);
+
+  // ---- rear ----
+  b.box(0.12, ROOF-WIN1,           MW, EV_NAVY,   -HL, (WIN1+ROOF)/2, 0);
+  b.box(0.12, WIN1-WIN0,           MW, BLK,       -HL-0.02, (WIN0+WIN1)/2, 0);
+  b.box(0.12, WIN0-(SPLIT+BAND_H), MW, EV_SIL,    -HL, ((SPLIT+BAND_H)+WIN0)/2, 0);
+  b.box(0.13, BAND_H,              MW, EV_NAVY_D, -HL-0.005, SPLIT+BAND_H/2, 0);
+  b.box(0.12, SPLIT-BODY_B,        MW, EV_SIL,    -HL, (BODY_B+SPLIT)/2, 0);
+  b.box(0.13, 0.07,                MW, 0x4b5058,  -HL, BODY_B+0.02, 0);
+  for (const sz of [1,-1]) b.box(0.10, 0.44, 0.24, 0x8b1f24, -HL-0.05, 1.14, sz*0.92);
+
+  // ---- front ----
+  b.box(0.22, F.B1-F.B0, MW-2*IN+0.06, EV_SIL,   FX+0.03, (F.B0+F.B1)/2, 0);   // bumper
+  b.box(0.24, 0.16,      MW-2*IN+0.06, 0x1a1d23, FX+0.04, F.B0+0.06, 0);       // valance under it
+  b.box(0.14, F.P1-F.B1, MW-2*IN,      EV_NAVY,  FX+0.02, (F.B1+F.P1)/2, 0);   // badge/fleet panel
+  b.box(0.16, (ROOF+0.02)-F.S1, MW,    EV_NAVY,  FX+0.03, ((ROOF+0.02)+F.S1)/2, 0);  // brow
+  b.box(0.09, (ROOF+0.02)-F.S1, MW-0.10, 0x161c26, FX-0.06, ((ROOF+0.02)+F.S1)/2, 0);
+  // The screen stays an open aperture with a black surround: fill it and you lose the
+  // driver and the whole front of the saloon, which is half of why this bus reads at all.
+  for (const sz of [1,-1])
+    b.box(0.16, F.S1-F.P1, 0.26, BLK, FX+0.03, (F.P1+F.S1)/2, sz*(MW/2-IN-0.10));
+  b.box(0.17, 0.10, MW-2*IN, BLK, FX+0.04, F.P1+0.05, 0);
+  b.box(0.17, 0.10, MW-2*IN, BLK, FX+0.04, F.S1-0.05, 0);
+  // The front is rounded, not boxy: a slanted panel tucks each corner back into the
+  // flank instead of letting the front face meet it at a right angle.
+  const CORN = [[F.B0,F.B1,EV_SIL], [F.B1,F.P1,EV_NAVY], [F.P1,F.S1,BLK], [F.S1,ROOF+0.02,EV_NAVY]];
+  for (const sz of [1,-1]) for (const c of CORN)
+    b.box(0.50, c[1]-c[0], 0.11, c[2], FX-0.20, (c[0]+c[1])/2, sz*(HW-0.14), 0, sz*0.70, 0);
+  // the blind box stands proud of the screen so the gaps between its dots stay black
+  b.box(0.07, F.BLIND_H+0.06, 2.24, 0x05060a, FX+0.10, F.BLIND_Y, 0);
+  // slim LED headlamps, indicator outboard of each, and the daytime bar between them
+  for (const sz of [1,-1]){
+    b.box(0.10, 0.26, 0.80, 0x14171d, FX+0.15, 0.84, sz*0.62);
+    b.box(0.08, 0.085,0.68, 0xf6f9ff, FX+0.20, 0.90, sz*0.62);
+    b.box(0.07, 0.055,0.22, 0xffc97a, FX+0.19, 0.75, sz*0.90);
+  }
+  b.box(0.09, 0.06, 1.24, 0xeaf1ff, FX+0.19, 1.06, 0);
+  // wipers parked low across the screen
+  for (const sz of [1,-1]){
+    b.box(0.05,0.05,1.02, 0x15171b, FX+0.12, 1.96, sz*0.54, 0.68);
+    b.box(0.06,0.16,0.07, 0x15171b, FX+0.12, 1.80, sz*0.54);
+  }
+  // mirrors: black heads out on stalks either side of the screen
+  for (const sz of [1,-1]){
+    b.cyl(0.035,0.035,0.62,6, 0x1b1e24, FX-0.24, 2.92, sz*(HW+0.20), 0,0,-sz*0.30);
+    b.box(0.09,0.54,0.24, 0x1b1e24, FX-0.40, 2.62, sz*(HW+0.36));
+    b.box(0.03,0.44,0.18, 0x3a4049, FX-0.46, 2.62, sz*(HW+0.36));
+  }
+
+  // ---- flanks ----
+  function flank(z, hasDoor){
+    const segs = hasDoor ? [[-HL, 0.78],[2.22, HL]] : [[-HL, HL]];
+    for (const s of segs){
+      const w=s[1]-s[0], cx=(s[0]+s[1])/2;
+      b.box(w, SPLIT-BODY_B,        0.09, EV_SIL,    cx, (BODY_B+SPLIT)/2, z);
+      b.box(w, 0.07,                0.11, 0x4b5058,  cx, BODY_B+0.02, z);
+      b.box(w, BAND_H,              0.10, EV_NAVY_D, cx, SPLIT+BAND_H/2, z);
+      b.box(w, WIN0-(SPLIT+BAND_H), 0.09, EV_SIL,    cx, ((SPLIT+BAND_H)+WIN0)/2, z);
+    }
+    b.box(HL*2, ROOF-WIN1, 0.09, EV_NAVY, 0, (WIN1+ROOF)/2, z);
+    // Rubbers top and bottom plus black pillars: this is the whole trick, the flank has
+    // to read as one dark ribbon rather than a row of separate windows.
+    b.box(HL*2, 0.06, 0.11, BLK, 0, WIN0+0.03, z);
+    b.box(HL*2, 0.06, 0.11, BLK, 0, WIN1-0.03, z);
+    for (const px of EV_PIL) b.box(0.12, WIN1-WIN0, 0.10, BLK, px, (WIN0+WIN1)/2, z);
+    // the rear-most bay is a black panel, not a window — that is where the roundel goes
+    b.box(1.42, WIN1-WIN0, 0.09, BLK, -5.43, (WIN0+WIN1)/2, z);
+    if (hasDoor){
+      // The bulkhead across the back of the entrance well.  The boarding code stops
+      // people dead here, so it has to sit exactly where the school buses' does.
+      const bz = z + (DOOR_BACK - (BUS_Z - BUS_HW));
+      b.box(1.44, 1.02, 0.10, 0x2b3038, 1.50, 1.00, bz);
+      b.box(1.44, 0.08, 0.14, 0x3d434c, 1.50, 1.52, bz);
+      b.cyl(0.045,0.045,2.04,8, 0xd8b12a, 1.50, 1.54, bz-0.10);
+      b.box(0.42,0.34,0.16, 0x1f242c, 0.98, 1.32, bz-0.08);      // ticket machine
+      b.box(0.30,0.16,0.03, 0x2f7ac4, 0.98, 1.38, bz-0.17);
+      b.box(0.10, 2.32, 0.14, BLK, 0.78, 1.62, z);
+      b.box(0.10, 2.32, 0.14, BLK, 2.22, 1.62, z);
+      b.box(1.54, 0.14, 0.14, BLK, 1.50, 2.84, z);
+      b.box(1.54, 0.10, 0.10, 0xd8b12a, 1.50, 0.52, z-0.02);     // yellow step edge
+    }
+  }
+  flank(-HW, true);
+  flank( HW, false);
+
+  // ---- three axles, the rear pair close together, on polished alloys ----
+  for (const wx of EV_AXLE){
+    for (const sz of [1,-1]) b.box(1.32, 0.72, 0.05, 0x171b22, wx, 0.70, sz*(HW+0.012));
+    for (const wz of [-1.18, 1.18]){
+      b.cyl(0.52,0.52,0.30,14, 0x15171b, wx, 0.52, wz, Math.PI/2,0,0);
+      b.cyl(0.29,0.29,0.33,10, 0xb0b6bf, wx, 0.52, wz, Math.PI/2,0,0);
+      b.cyl(0.11,0.11,0.36,8,  0x9aa0a8, wx, 0.52, wz, Math.PI/2,0,0);
+    }
+  }
+  b.box(9.4,0.28,2.2, 0x23272d, -1.0, 0.24, 0);
+  return b.build();
+}
+function makeBusElectric(){
+  const group = new THREE.Group();
+  const ext = new THREE.Mesh(buildEVExterior(), VMAT());
+  ext.castShadow=true; ext.receiveShadow=true; group.add(ext);
+
+  // The saloon is the school buses' — same seats in the same order, because the
+  // boarding ladder and the ride camera are both measured off it.
+  const interior = buildBusInterior();
+  const intMesh = new THREE.Mesh(interior.geo, VMAT({side:THREE.DoubleSide}));
+  intMesh.receiveShadow=true; group.add(intMesh);
+
+  const {HL,HW,WIN0,WIN1,SPLIT,BAND_H,ROOF} = EVG, F = EVF, MW = HW*2;
+  const WY=(WIN0+WIN1)/2, WH=WIN1-WIN0, BANDY=SPLIT+BAND_H/2;
+  function glass(w,h,x,y,z,ry,mat){
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h), mat||evGlassMat);
+    m.position.set(x,y,z); m.rotation.y=ry||0; group.add(m); return m;
+  }
+  // the bays between the pillars, minus the rear-most one (black panel) and the doorway
+  const segsDoor = [[-4.60,-3.18],[-3.06,-1.64],[-1.52,-0.10],[0.02,0.72],[2.28,3.56],[3.68,4.90],[5.02,6.14]];
+  const segsOff  = segsDoor.concat([[0.84,2.16]]);
+  for (const r of segsDoor) glass(r[1]-r[0], WH, (r[0]+r[1])/2, WY, -HW-0.005, 0);
+  for (const r of segsOff)  glass(r[1]-r[0], WH, (r[0]+r[1])/2, WY,  HW+0.005, 0);
+  (function(){                                   // one big raked pane, corner to corner
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(MW-2*0.30, 1.30), evScreenMat);
+    m.rotation.order = 'YXZ';
+    m.rotation.set(-0.34, Math.PI/2, 0);
+    m.position.set(HL + 0.055, 2.40, 0);
+    group.add(m);
+  })();
+  glass(1.94, WH-0.14, -HL-0.09, WY, 0, Math.PI/2, evScreenMat);
+
+  function decal(tex,w,h,x,y,z,ry){
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h), new THREE.MeshBasicMaterial({map:tex,transparent:true}));
+    m.position.set(x,y,z); m.rotation.y=ry||0; group.add(m); return m;
+  }
+  const TEX871 = TEX_ROUTE['871'];
+  // Front.  Texture +X maps to world -Z at this rotation, so the fleet number lands on
+  // the kerb side of the front, where it is on the real bus.
+  const ledFront = decal(TEX871, 2.14, F.BLIND_H, HL+0.145, F.BLIND_Y, 0, Math.PI/2);
+  decal(TEX_EV_FLEETF, 0.86,0.14, HL+0.11, 1.44, -0.74, Math.PI/2);
+  decal(TEX_EV_ROUND,  0.38,0.38, HL+0.11, 1.42,  0.00, Math.PI/2);
+  decal(TEX_EV_PLATE,  0.70,0.23, HL+0.16, 0.58,  0.00, Math.PI/2);
+  // Sides: the band runs the length of the flank, the roundel sits on the rear panel.
+  for (const sz of [1,-1]){
+    const zz = sz*(HW+0.055), ry = sz<0 ? Math.PI : 0;
+    decal(TEX_EV_BAND,   HL*2, BAND_H, 0,     BANDY, zz, ry);
+    decal(TEX_EV_ROUND,  1.00, 1.00,  -5.43,  WY,    zz, ry);
+    decal(TEX_EV_FLEETS, 0.70, 0.11,   2.75,  1.28,  zz, ry);
+  }
+  decal(TEX_EV_BAND_R, MW, BAND_H, -HL-0.10, BANDY, 0, -Math.PI/2);  // the band carries on round the back
+  const ledSide = decal(TEX871, 0.94,0.21, 0.36, 2.79, -HW-0.06, Math.PI);
+
+  // ---- doors: same two leaves in the same place as the school buses ----
+  function leaf(dirX){
+    const p = new THREE.Group();
+    const bb = new Builder();
+    const w=0.70;
+    bb.box(w,2.06,0.07, 0x14171e, dirX*w/2, 1.62, 0);
+    bb.box(w,0.10,0.09, 0x14171e, dirX*w/2, 0.60, 0);
+    bb.box(0.07,2.06,0.09, 0x14171e, dirX*w, 1.62, 0);
+    bb.box(w*0.5,0.06,0.09, 0xd8b12a, dirX*w*0.5, 1.20, -0.03);
+    const m=new THREE.Mesh(bb.build(), VMAT()); m.castShadow=true;
+    p.add(m);
+    const gl=new THREE.Mesh(new THREE.PlaneGeometry(w*0.86,1.82), evGlassMat);
+    gl.position.set(dirX*w/2, 1.66, 0.01); p.add(gl);
+    group.add(p);
+    return p;
+  }
+  const doorA = leaf( 1); doorA.position.set(0.78, 0, -BUS_HW-0.04);
+  const doorB = leaf(-1); doorB.position.set(2.22, 0, -BUS_HW-0.04);
+
+  const FIT = fitOutSingleDeck(group, interior);
+  const occupants = FIT.occupants, BASE_LOAD = FIT.baseLoad;
+  const RIDE_X = FIT.RIDE_X, RIDE_Z = FIT.RIDE_Z;
+  for (const lx of [3.4, 0.2, -3.2]){
+    const pl = new THREE.PointLight(0xfff1d8, 0.62, 7.5, 2);
+    pl.position.set(lx, 2.80, 0); group.add(pl);
+  }
+  const driver = new THREE.Mesh(buildDriver(), studentMat);
+  driver.position.set(4.62, 1.60, 0.72); driver.rotation.y = -Math.PI/2;
+  group.add(driver);
+
+  scene.add(group);
+  return {
+    group, doorA, doorB, occupants, doorT:0,
+    setDoor(t){
+      this.doorT=t;
+      const a = t*1.75;
+      doorA.rotation.y =  a;
+      doorB.rotation.y = -a;
+    },
+    capacity: occupants.length,
+    isDouble: false, seatCount: 20, baseLoad: BASE_LOAD,   // no top deck, so no top-deck bonus
+    ridePos: { x: RIDE_X, y: 1.02 + 1.52, z: RIDE_Z },
+    frontSeats: [],
+    fill(n){ for (let i=0;i<this.occupants.length;i++){
+      const o=this.occupants[i]; o.visible = (i<n) && !o.userData.taken; } },
+    setBoarded(n){ this.fill(this.baseLoad + n); },
+    setLoad(){ this.fill(this.baseLoad); },
+    releaseSeats(){ for (const o of this.occupants) o.userData.taken=false; },
+    setFront(){}, clearFront(){},
+    route: SCHOOL_ROUTES[SCHOOL_ROUTES.length-1],
+    setRoute(r){
+      this.route = r;
+      const tex = TEX_ROUTE[r.n] || TEX871;
+      ledFront.material.map = tex; ledFront.material.needsUpdate = true;
+      ledSide.material.map  = tex; ledSide.material.needsUpdate  = true;
+    }
   };
 }
 
@@ -2355,6 +2759,18 @@ const HALL = {
   ROWS: 21, ROW0: -15.4, ROW_P: 1.24,
   COLS: 16, COL_P: 0.70, AISLE: 1.55
 };
+/* The side walls run in bays, the way the real ones do: an honours board or a
+   black acoustic panel in each, one after the other all the way down.  The
+   shell builder and Hall.build() both read this, so they agree about which bay
+   has a board in it and which is free for a panel. */
+const HALL_BAYS = 10;
+const hallBayZ = i => HALL.ZF + 3.0 + i*2.20;
+const HALL_BOARD_BAYS = [[3,6],[0,2,4,6]];   // -X wall, +X wall — one entry per board
+const HALL_ART_BAY = 9;                      // the framed painting, both sides
+/* The folding wall across the back: sixteen leaves hinged at their left edge,
+   swinging into the corridor when the deans let the school go. */
+const HALL_LEAF_W = 1.45, HALL_LEAF_H = 3.50, HALL_LEAF_N = 16;
+const HALL_LEAF_X0 = -11.6, HALL_LEAF_Z = HALL.ZB - 0.24;
 function seatX(col){                // two blocks, centre aisle, side aisles either end
   const i = col < HALL.COLS ? col : col - HALL.COLS;
   const s = col < HALL.COLS ? -1 : 1;
@@ -2447,12 +2863,39 @@ function kiwiSlideTexture(){
   return t;
 }
 
+/* The slide that goes up on the sentence he finishes the assembly on. */
+const CLOSER_SLIDE_SRC = 'data:image/jpeg;base64,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AAAAAAAAAAAAAAAAAKQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAKQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAKQAASRBQAAABAQQAAABCCAAAQAAAAAAAAAAAACQAAAAAAAAAAAAAAAAAAAAAAAAAKQAFIJXQLQDRQFSTCABaJACPSTGJSSQAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAKQAFBQbAHREQVQWIVQUQfEdLGSfOCbQAAAAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAKQAFCYcUGVCJVQPVIAALcJQWcEdLEWQAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAKQAAAAAAAAAAAAAAEQAAAAAAAAAAAAAAAAAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAKQAAAAAAAAAAAAAAAAAAAAACAAAAAAAAAAAAAKQAAAAAAAAAAAAAAAAAAAAAAAAAKQABISABQBBBSACYRBCBDRUYBQAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAKQABbBKVQETWNLKVGdJDFIHAYDQAAAAAAAAAABQAAAAAAAAAAAAAAAAAAAAAAAAAKQAFAeCFHAFSUfNQbfVQEXfSEMQAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAKQAAAAAAAAAAAAAAAAAAAAAEaAAAAAAAAAAAAAKQAAAAAAAAAAAAAAAAAAAAAAAAKQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAKQABERQAAAAAAAAPScRDCQAAASPAAJAAAAAAAAAIQAAAAAAAAAAAAAAAAAAAAAAAKQAFJZBIQGbDGDcFKZYKVWEbMXfbeQMfAQAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAKQAEMabNebQCaQeAKUHZVXLJZBIYP1BZMAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAKQAAMAAATYUIEcUYQAIQQMAcAAEYEUUUIQAAAAAAAIQAAAAAAAAAAAAAAAAAAAAAKQAQwgwggQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJQAAAAAAAAAAAAAAAAAAAAKSwQAAAAAAAQAAAAAAAAAAAAAAAAAAA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';
+const CLOSER_SLIDE_BG  = '#173c30';
+
+/* Both of the picture slides are the same job: letterbox an exact image onto
+   the screen without cropping or squashing it. */
+function imageSlideTexture(src, bg){
+  const W = 1024, H = SLIDE_H;
+  const c = document.createElement('canvas'); c.width=W; c.height=H;
+  const g = c.getContext('2d');
+  g.fillStyle = bg; g.fillRect(0,0,W,H);
+  const t = new THREE.CanvasTexture(c);
+  t.anisotropy = 4;
+  if (src){
+    const im = new Image();
+    im.onload = function(){
+      g.fillStyle = bg; g.fillRect(0,0,W,H);
+      const k = Math.min(W/im.width, H/im.height);
+      const w = im.width*k, h = im.height*k;
+      g.drawImage(im, (W-w)/2, (H-h)/2, w, h);
+      t.needsUpdate = true;
+    };
+    im.src = src;
+  }
+  return t;
+}
+
 /* All three screens share one material, so the whole hall changes slide at once. */
-const SLIDE_TEX = { normal:null, kiwi:null };
+const SLIDE_TEX = { normal:null, kiwi:null, closer:null };
 function hallSlideShow(which){
   const m = Hall.slide && Hall.slide.material;
   if (!m || !SLIDE_TEX.normal) return;
-  const t = (which === 'kiwi') ? (SLIDE_TEX.kiwi || SLIDE_TEX.normal) : SLIDE_TEX.normal;
+  const t = SLIDE_TEX[which] || SLIDE_TEX.normal;
   if (m.map !== t){ m.map = t; m.needsUpdate = true; }
 }
 
@@ -2814,34 +3257,64 @@ function boardTexture(spec){
 function buildHallShell(){
   const b = new Builder();
   const W=HALL.W, ZF=HALL.ZF, ZB=HALL.ZB, H=HALL.H;
-  const CARPET=0x6f6d66, CONC=0x7e7e7a, TIMBER=0xa8763f, TIMBER_D=0x7d5528,
-        DARK=0x16181c, BEAM=0x2a2d33, CEIL=0x141619;
-  // ---- floor (tiered slightly toward the back) ----
-  b.box(W*2, 0.20, ZB-ZF+8, CARPET, 0, -0.10, (ZF+ZB)/2 - 2);
+  const CARPET=0x3a3b3a, CONC=0x8b8b85, TIMBER=0xa8763f, TIMBER_D=0x7d5528,
+        DARK=0x16181c, BEAM=0x565c66, CEIL=0x0e1013, JOINT=0x66665f,
+        ACOUS=0x0e0f12, DUCT=0x8c908f;
+  /* Lambert lights per vertex, so a thirty-metre floor with eight corners is
+     lit at the corners and nowhere else — which is why the odd small box on it
+     used to come out white.  Everything large in here is a subdivided plane. */
+  b.box(W*2, 0.20, ZB-ZF+8, 0x2b2c2b, 0, -0.11, (ZF+ZB)/2 - 2);
+  b.push(new THREE.PlaneGeometry(W*2, ZB-ZF+8, 26, 36), CARPET,
+         0, 0, (ZF+ZB)/2-2, -Math.PI/2);
   for (let x=-W+0.6;x<W;x+=1.2) for (let z=ZF-2;z<ZB;z+=1.2)
-    if (Math.random()<0.30) b.box(1.15,0.012,1.15, 0x757369, x, 0.006, z);
-  // ---- ceiling + beams ----
+    if (Math.random()<0.30) b.box(1.15,0.012,1.15, 0x343533, x, 0.006, z);
+  // ---- ceiling: black, with the steel coffer grid sitting proud of it ----
   b.box(W*2, 0.30, ZB-ZF+8, CEIL, 0, H+0.15, (ZF+ZB)/2 - 2);
-  for (let z=ZF-2; z<ZB; z+=4.6) b.box(W*2, 0.55, 0.42, BEAM, 0, H-0.28, z);
-  for (const x of [-9.6, -3.2, 3.2, 9.6]) b.box(0.42, 0.55, ZB-ZF+6, BEAM, x, H-0.28, (ZF+ZB)/2-1);
-  // long linear light panels
-  for (let z=ZF+1; z<ZB-1; z+=4.6)
-    for (const x of [-11.6,-6.4,0,6.4,11.6]) b.box(0.34, 0.06, 1.7, 0xf2eee0, x, H-0.60, z);
-  // ---- walls ----
+  for (let z=ZF-2; z<ZB+2; z+=4.6) b.box(W*2, 0.52, 0.40, BEAM, 0, H-0.26, z);
+  for (const x of [-11.4, -7.0, -2.3, 2.3, 7.0, 11.4])
+    b.box(0.34, 0.46, ZB-ZF+6, BEAM, x, H-0.29, (ZF+ZB)/2-1);
+  /* Lighting bars slung on wires under the grid, black lanterns clipped along
+     them.  The lenses glow — they live in the unlit mesh, not this one. */
+  for (const z of [ZF+3.2, ZF+9.4, ZF+15.8, ZF+22.2, ZF+28.6]){
+    b.box(W*1.62, 0.13, 0.13, 0x30343b, 0, H-1.62, z);
+    for (const x of [-10.6,-5.4,0,5.4,10.6]) b.box(0.045, 1.28, 0.045, 0x494e56, x, H-0.96, z);
+    for (const x of [-9.4,-6.2,-3.1,0.5,3.7,6.9,9.9]){
+      b.box(0.21,0.36,0.44, 0x101216, x, H-1.94, z);        // lantern body
+      b.box(0.14,0.14,0.18, 0x1b1e23, x, H-1.78, z+0.28);   // yoke and barrel
+    }
+  }
+  // ---- side walls: bare precast concrete, panel joints and all ----
   b.box(0.35, H+1, ZB-ZF+8, CONC, -W, (H+1)/2, (ZF+ZB)/2-2);
   b.box(0.35, H+1, ZB-ZF+8, CONC,  W, (H+1)/2, (ZF+ZB)/2-2);
-  b.box(W*2, H+1, 0.35, CONC, 0, (H+1)/2, ZB);
-  // timber batten panelling either side, front half
-  for (const sx of [-1, 1]){
-    for (let z=ZF+0.6; z<ZF+9.0; z+=0.20){
-      b.box(0.10, 4.6, 0.11, (Math.random()<0.5?TIMBER:TIMBER_D), sx*(W-0.22), 3.4, z);
-    }
-    b.box(0.14, 0.22, 8.6, 0x8d9298, sx*(W-0.22), 5.85, ZF+4.8);   // strip light
+  for (const sx of [-1,1]){
+    b.push(new THREE.PlaneGeometry(ZB-ZF+8, H+1, 24, 7), CONC,
+           sx*(W-0.19), (H+1)/2, (ZF+ZB)/2-2, 0, sx>0 ? -Math.PI/2 : Math.PI/2);
+    for (let z=ZF+1.1; z<ZB; z+=2.20) b.box(0.05, H, 0.10, JOINT, sx*(W-0.215), H/2, z);
+    b.box(0.05, 0.10, ZB-ZF-2.2, JOINT, sx*(W-0.215), 6.35, (ZF+ZB)/2-1);
   }
-  // black acoustic panels down the sides, back half
-  for (const sx of [-1,1])
-    for (let z=ZF+10; z<ZB-2.5; z+=3.4)
-      b.box(0.10, 3.6, 2.1, 0x121316, sx*(W-0.24), 4.4, z);
+  // timber batten panelling, one bay of it either side of the stage
+  for (const sx of [-1, 1]){
+    for (let z=ZF+0.55; z<ZF+4.5; z+=0.22)
+      b.box(0.10, 5.0, 0.13, (Math.random()<0.5?TIMBER:TIMBER_D), sx*(W-0.27), 3.5, z);
+    b.box(0.15, 5.0, 0.11, 0x5c4718, sx*(W-0.285), 3.5, ZF+0.44);
+    b.box(0.15, 5.0, 0.11, 0x5c4718, sx*(W-0.285), 3.5, ZF+4.54);
+    b.box(0.14, 0.20, 3.9, 0x8d9298, sx*(W-0.29), 6.25, ZF+2.5);   // strip light
+  }
+  /* Black acoustic panels in every bay the honours boards do not want. */
+  for (let side=0; side<2; side++){
+    const sx = side ? 1 : -1;
+    for (let i=0;i<HALL_BAYS;i++){
+      if (i===HALL_ART_BAY || HALL_BOARD_BAYS[side].indexOf(i) >= 0) continue;
+      b.box(0.09, 4.62, 1.72, ACOUS, sx*(W-0.28), 3.92, hallBayZ(i));
+    }
+    // galvanised ventilation ducts dropping down the wall between the bays
+    for (const i of [0,2,4,6]){
+      const z = hallBayZ(i) + 1.10;
+      b.cyl(0.38,0.38,4.55,8, DUCT, sx*(W-0.56), 6.20, z);
+      b.box(0.86, 0.34, 0.86, 0x7f8382, sx*(W-0.56), 8.36, z);          // the boot at the ceiling
+      for (const y of [5.05, 6.35, 7.65]) b.cyl(0.43,0.43,0.09,8, 0x7f8382, sx*(W-0.56), y, z);
+    }
+  }
   // ---- front wall + proscenium opening ----
   const OPEN = 7.0;                       // half width of the stage aperture
   b.box(W-OPEN, H+1, 0.5, CONC, -(OPEN+(W-OPEN)/2), (H+1)/2, ZF-0.3);
@@ -2902,20 +3375,119 @@ function buildHallShell(){
   b.box(0.80,0.07,0.60, 0x8a5c33, 0, HALL.STAGE_Y+1.18, ZF-2.4);
   b.box(0.10,0.10,0.30, 0x2a2d33, 0, HALL.STAGE_Y+1.30, ZF-2.55);
   b.box(0.06,0.06,0.16, 0x1a1c1f, 0, HALL.STAGE_Y+1.44, ZF-2.66);
-  // ---- rear mezzanine ----
+  // line-array cabinets flown either side of the stage, as in the real room
+  for (const sx of [-1,1]) for (let i=0;i<4;i++)
+    b.box(0.52, 0.30, 0.62, 0x0f1114, sx*12.9, 6.60-i*0.32, ZF+1.6, 0.10*i);
+  /* ---- back wall ----
+     Concrete piers either end and a header above, but the middle of it below
+     the balcony is a hole: that is where the folding wall goes, and behind it
+     the corridor.  Nothing structural, so nothing to hold up. */
+  const BR = 11.6;                                   // half width of the openable run
+  b.box(W-BR, H+1, 0.35, CONC, -(BR+(W-BR)/2), (H+1)/2, ZB);
+  b.box(W-BR, H+1, 0.35, CONC,  (BR+(W-BR)/2), (H+1)/2, ZB);
+  b.box(BR*2, H+1-4.05, 0.35, CONC, 0, 4.05+(H+1-4.05)/2, ZB);
+  b.box(BR*2, 0.56, 0.30, 0x101215, 0, 3.78, ZB-0.24);   // black pelmet over the glazing
+  // ---- mezzanine: across the back, and a short arm down each side ----
   b.box(W*2, 0.35, 5.4, 0x6d635a, 0, 4.30, ZB-3.0);
-  b.box(W*2, 1.15, 0.30, 0x8a7f74, 0, 5.05, ZB-5.7);
-  b.box(W*2, 0.30, 5.4, 0x2a2d33, 0, 4.12, ZB-3.0);
-  for (const x of [-9.0, 0, 9.0]) b.cyl(0.14,0.14,4.3,8, 0x2a2d33, x, 2.15, ZB-5.6);
-  b.box(1.9,1.1,0.12, 0x0d0f12, 0, 4.95, ZB-5.86);      // hanging screen
-  // ---- rear doors ----
-  for (const x of [-3.4, 3.4]){
-    b.box(2.3, 2.5, 0.14, 0xb07c42, x, 1.25, ZB-0.22);
-    b.box(0.10, 2.5, 0.16, 0x8a5c33, x-1.15, 1.25, ZB-0.24);
-    b.box(0.10, 2.5, 0.16, 0x8a5c33, x+1.15, 1.25, ZB-0.24);
-    b.box(0.34,0.62,0.06, 0x2f4a63, x-0.55, 1.75, ZB-0.30);
-    b.box(0.34,0.62,0.06, 0x2f4a63, x+0.55, 1.75, ZB-0.30);
+  b.box(W*2, 0.30, 5.4, 0x3f3b36, 0, 4.12, ZB-3.0);
+  b.box(W*2, 1.15, 0.30, 0x8a7f74, 0, 5.05, ZB-5.7);      // panelled front edge
+  b.box(W*2, 0.11, 0.40, 0x6b6058, 0, 5.67, ZB-5.72);     // capping rail
+  for (let x=-W+2.6; x<W; x+=3.8) b.box(0.07, 1.15, 0.36, 0x6b6058, x, 5.05, ZB-5.73);
+  for (const sx of [-1,1]){
+    b.box(2.2, 0.35, 8.4, 0x6d635a, sx*14.1, 4.30, 11.9);
+    b.box(2.2, 0.30, 8.4, 0x3f3b36, sx*14.1, 4.12, 11.9);
+    b.box(0.30, 1.15, 8.4, 0x8a7f74, sx*13.0, 5.05, 11.9);
+    b.box(0.40, 0.11, 8.4, 0x6b6058, sx*13.0, 5.67, 11.9);
+    for (let z=8.5; z<16.0; z+=3.8) b.box(0.36, 1.15, 0.07, 0x6b6058, sx*13.02, 5.05, z);
+    b.cyl(0.13,0.13,4.2,8, 0x24272c, sx*13.0, 2.10, 8.6);
+    b.cyl(0.13,0.13,4.2,8, 0x24272c, sx*13.0, 2.10, 15.0);
   }
+  for (const x of [-9.0, 0, 9.0]) b.cyl(0.14,0.14,4.2,8, 0x24272c, x, 2.10, ZB-5.6);
+  b.box(1.9,1.1,0.12, 0x0d0f12, 0, 4.95, ZB-5.88);        // the telly on the balcony front
+  b.box(2.1,0.10,0.18, 0x2a2d33, 0, 5.56, ZB-5.86);
+  // the timber-fronted projection box hanging off the right-hand balcony
+  b.box(2.0, 1.45, 1.7, TIMBER, 13.6, 5.20, 12.6);
+  b.box(2.1, 0.12, 1.8, 0x6b4a22, 13.6, 5.98, 12.6);
+  b.box(1.4, 0.52, 0.10, 0x0c0e11, 13.6, 5.25, 11.72);
+  /* ---- stacks of spare chairs, parked along the back out of everyone's way.
+     They sit behind the line the crowd is clamped to, so nobody walks through
+     one on the way to the door. */
+  for (const sx of [-1,1]) for (const x of [5.8, 7.6, 9.4, 11.2, 13.0, 14.6]){
+    for (let i=0;i<8;i++){
+      const y = 0.42 + i*0.085, o = i*0.013;
+      b.box(0.50,0.05,0.46, 0x1b1d21, sx*x, y, 15.25+o);
+      b.box(0.50,0.42,0.05, 0x1b1d21, sx*x, y+0.24, 15.05+o, 0.10);
+    }
+    b.box(0.05,0.86,0.05, 0x2a2d33, sx*x-0.22, 0.44, 15.10);
+    b.box(0.05,0.86,0.05, 0x2a2d33, sx*x+0.22, 0.44, 15.10);
+  }
+  return b.build();
+}
+/* One leaf of the folding wall, hinged on its left edge at the local origin so
+   the instanced matrix can just be a rotation about Y. */
+function buildHallLeaf(){
+  const b=new Builder();
+  const LW=HALL_LEAF_W, LH=HALL_LEAF_H, cx=LW/2;
+  const TIM=0x9a7440, TIM_D=0x6e4f24, GLASS=0xc3d4da;
+  b.box(0.13, LH, 0.15, TIM_D, 0.065, LH/2, 0);          // hinge stile
+  b.box(0.11, LH, 0.15, TIM_D, LW-0.055, LH/2, 0);       // meeting stile
+  b.box(LW, 0.17, 0.15, TIM, cx, LH-0.085, 0);           // head
+  b.box(LW, 0.15, 0.15, TIM, cx, 0.075, 0);              // sill
+  b.box(LW-0.22, 0.58, 0.14, TIM, cx, 0.45, 0);          // solid panel below the glass
+  b.box(LW-0.22, 0.14, 0.15, TIM_D, cx, 0.81, 0);        // mid rail
+  b.box(LW-0.26, LH-1.06, 0.06, GLASS, cx, 0.88+(LH-1.06)/2, 0);
+  return b.build();
+}
+/* Everything past the folding wall.  Unlit on purpose — the corridor is a
+   daylit box seen from a dark room, and a Lambert one would just go black. */
+function buildHallCorridor(){
+  const b=new Builder(); const ZB=HALL.ZB;
+  b.box(26.0, 0.20, 6.0, 0xb2ada1, 0, -0.08, ZB+3.2);
+  b.box(26.0, 0.30, 6.0, 0xdedacd, 0, 3.86, ZB+3.2);
+  b.box(26.0, 4.20, 0.30, 0xd2cec2, 0, 2.00, ZB+6.1);
+  b.box(26.0, 0.55, 0.16, 0x8f8c82, 0, 0.28, ZB+5.90);
+  for (let x=-11.7; x<=11.7; x+=2.6){
+    b.box(2.10, 2.30, 0.10, 0xe4edf2, x, 2.25, ZB+5.90);
+    b.box(0.16, 2.50, 0.16, 0xa9834b, x-1.13, 2.20, ZB+5.86);
+  }
+  // enough furniture out there that the opening reads as somewhere to go
+  for (const x of [-9.1, -3.9, 6.5]){
+    b.box(2.30, 1.70, 0.10, 0x8f6a3a, x, 1.78, ZB+5.78);       // noticeboards
+    b.box(2.10, 1.50, 0.06, 0xd9d2bd, x, 1.78, ZB+5.72);
+  }
+  for (let x=-12.8; x<12.8; x+=0.62){
+    if (Math.abs(x) < 3.4) continue;                            // the way through
+    b.box(0.58, 1.72, 0.42, (x<0?0x5d7d8c:0x6b6f75), x, 0.96, ZB+2.25);
+    b.box(0.58, 0.09, 0.44, 0x484c52, x, 1.86, ZB+2.25);
+  }
+  return b.build();
+}
+/* The lit fittings: recessed downlights, fluorescent strips, lantern lenses,
+   the row under the balcony.  All one unlit mesh, so they read as light. */
+function buildHallGlow(){
+  const b=new Builder();
+  const W=HALL.W, ZF=HALL.ZF, ZB=HALL.ZB, H=HALL.H;
+  const LAMP=0xfff6e6, TUBE=0xf4f1e6;
+  for (let k=0;k<9;k++){
+    const z0 = ZF-2 + k*4.6;
+    for (const dz of [1.15, 3.45]){
+      const z = z0+dz; if (z > ZB+1.2) continue;
+      for (const x of [-13.4,-9.2,-4.6,0,4.6,9.2,13.4]) b.box(0.26,0.05,0.26, LAMP, x, H-0.07, z);
+    }
+    const zc = z0+2.30; if (zc > ZB+1.2) continue;
+    for (const x of [-13.4,-4.6,4.6,13.4]) b.box(0.30,0.06,1.70, TUBE, x, H-0.11, zc);
+    for (const x of [-9.2,0,9.2])          b.box(0.26,0.05,0.26, LAMP, x, H-0.07, zc);
+  }
+  for (const z of [ZF+3.2, ZF+9.4, ZF+15.8, ZF+22.2, ZF+28.6])
+    for (const x of [-9.4,-6.2,-3.1,0.5,3.7,6.9,9.9])
+      b.box(0.15,0.05,0.16, 0xffe3ab, x, H-2.13, z);
+  // under the balcony, which is lit from below in the real room
+  for (let x=-13.6; x<=13.6; x+=2.2) b.box(0.26,0.05,0.26, LAMP, x, 3.94, ZB-3.6);
+  for (const sx of [-1,1]) for (let z=8.6; z<=15.4; z+=2.2)
+    b.box(0.26,0.05,0.26, LAMP, sx*14.1, 3.94, z);
+  // exit signs over the way out, and over the doors either side of the stage
+  for (const x of [-3.4, 3.4]) b.box(0.62,0.24,0.08, 0x39d17a, x, 3.28, ZB-0.62);
+  for (const sx of [-1,1])     b.box(0.10,0.24,0.62, 0x39d17a, sx*(HALL.W-0.34), 3.30, HALL.ZF+6.4);
   return b.build();
 }
 
@@ -3272,10 +3844,12 @@ const Hall = (function(){
   let group=null, built=false, lights=[], slide=null, sideSlides=[], recogN=4;
   const seats=[];              // {x,z,row,taken}
   const crowd=[];              // {x,z,vx,vz,mesh,standGeo,sitGeo,seat,seated,ry}
-  let deputy=null, head=null, recog=[], wordGroup=null, curtainL=null, curtainR=null;
+  let deputy=null, head=null, recog=[], wordGroup=null, curtainL=null, curtainR=null, backLeaves=null;
   const prefects=[], stageBoys=[];
   let vapeGroup=null; const puffs=[];
-  let staticSit=null, staticStand=null;
+  const extras=[], exSit=[], exStand=[];   // the back rows and the side blocks
+  const EX_VARIANTS = 4;                   // four bodies, four draw calls, three hundred boys
+  let extrasUp=false, extrasOut=0, extrasDirty=true;
   const staff=[]; const staffBusy=[];
   const words=[];
   const P = { x:0, z:HALL.ZB-2.4, vx:0, vz:0, seat:-1, seated:false, standing:true };
@@ -3292,6 +3866,13 @@ const Hall = (function(){
     const shell = new THREE.Mesh(buildHallShell(), VMAT({side:THREE.DoubleSide}));
     group.add(shell);
     group.add(new THREE.Mesh(buildHallChairs(), VMAT()));
+    group.add(new THREE.Mesh(buildHallCorridor(),
+      new THREE.MeshBasicMaterial({vertexColors:true, side:THREE.DoubleSide})));
+    group.add(new THREE.Mesh(buildHallGlow(), new THREE.MeshBasicMaterial({vertexColors:true})));
+    backLeaves = new THREE.InstancedMesh(buildHallLeaf(), VMAT({side:THREE.DoubleSide}), HALL_LEAF_N);
+    backLeaves.frustumCulled = false;     // the bounds are one leaf, not the run
+    group.add(backLeaves);
+    writeBackWall(0);
     // motto band + crest above the proscenium
     const mot = new THREE.Mesh(new THREE.PlaneGeometry(13.0,0.80),
       new THREE.MeshBasicMaterial({map:mottoTexture()}));
@@ -3304,6 +3885,7 @@ const Hall = (function(){
        a single texture — draw it once, hang it three times. */
     SLIDE_TEX.normal = slideTexture();
     SLIDE_TEX.kiwi   = kiwiSlideTexture();
+    SLIDE_TEX.closer = imageSlideTexture(CLOSER_SLIDE_SRC, CLOSER_SLIDE_BG);
     const slideMat = new THREE.MeshBasicMaterial({map: SLIDE_TEX.normal});
     slide = new THREE.Mesh(new THREE.PlaneGeometry(CTR_SCR_W, CTR_SCR_H), slideMat);
     slide.position.set(0, HALL.STAGE_Y + 3.44, HALL.ZF - 7.28);
@@ -3323,10 +3905,12 @@ const Hall = (function(){
     ];
     for (let side=0; side<2; side++){
       const sx = side ? 1 : -1;
-      boards[side].forEach((spec,i)=>{
+      let n = 0;
+      boards[side].forEach(spec=>{
+        if (!spec) return;
         const m = new THREE.Mesh(new THREE.PlaneGeometry(1.62,4.24),
           new THREE.MeshLambertMaterial({map:boardTexture(spec), side:THREE.DoubleSide}));
-        m.position.set(sx*(HALL.W-0.32), 4.05, HALL.ZF + 2.4 + i*4.05);
+        m.position.set(sx*(HALL.W-0.30), 3.95, hallBayZ(HALL_BOARD_BAYS[side][n++]));
         m.rotation.y = sx>0 ? -Math.PI/2 : Math.PI/2;
         group.add(m);
       });
@@ -3341,13 +3925,13 @@ const Hall = (function(){
         g.fillRect(-rand(10,60),-rand(4,20),rand(20,120),rand(8,40)); g.restore(); }
       const m=new THREE.Mesh(new THREE.PlaneGeometry(2.0,1.5),
         new THREE.MeshLambertMaterial({map:new THREE.CanvasTexture(c), side:THREE.DoubleSide}));
-      m.position.set(sx*(HALL.W-0.30), 4.2, HALL.ZF+21.6);
+      m.position.set(sx*(HALL.W-0.30), 3.4, hallBayZ(HALL_ART_BAY));
       m.rotation.y = sx>0 ? -Math.PI/2 : Math.PI/2;
       group.add(m);
     }
     // seat grid
     for (let r=0;r<HALL.ROWS;r++) for (let c=0;c<HALL.COLS*2;c++)
-      seats.push({x:seatX(c), z:seatZ(r), row:r, col:c, taken:false, pre:false, prefect:isPrefectSeat(r,c)});
+      seats.push({x:seatX(c), z:seatZ(r), row:r, col:c, taken:false, prefect:isPrefectSeat(r,c)});
     // the rest of the school
     for (let i=0;i<NPC_N;i++){
       const standGeo = STUDENT_GEOS[rint(0,STUDENT_GEOS.length-1)];
@@ -3359,27 +3943,36 @@ const Hall = (function(){
                    mesh:m, standGeo, sitGeo, seat:-1, seated:false, ry:0, retime:0,
                    speed:rand(2.4,3.5) });
     }
-    // ---- the rest of the school, already seated down the back and along the sides ----
+    /* ---- the rest of the school, filling the back rows and the side blocks ----
+       Three hundred more boys than we can spare a mesh each for.  They get four
+       shared bodies and an instance matrix apiece, so they can walk in off the
+       back and walk out again at the end without costing a draw call a head. */
     (function(){
-      const sitG=[], standG=[];
+      const pool=[];
       for (const s of seats){
         const outer = (s.row >= HALL.ROWS-9) || (s.col<2 || s.col>=HALL.COLS*2-2);
-        if (!outer || Math.random()<0.12) continue;
-        s.taken = true; s.pre = true;
-        const rot = new THREE.Matrix4().makeRotationY(Math.PI);
-        const g1 = buildSeated();
-        g1.applyMatrix4(rot);
-        g1.applyMatrix4(new THREE.Matrix4().makeTranslation(s.x, 0.47, s.z));
-        sitG.push(g1);
-        const g2 = STUDENT_GEOS[rint(0,STUDENT_GEOS.length-1)].clone();
-        g2.applyMatrix4(rot);
-        g2.applyMatrix4(new THREE.Matrix4().makeTranslation(s.x, 0, s.z-0.06));
-        standG.push(g2);
+        if (!outer || s.prefect || Math.random()<0.12) continue;
+        pool.push(s);
       }
-      if (sitG.length){
-        staticSit = new THREE.Mesh(mergeGeos(sitG), studentMat); group.add(staticSit);
-        staticStand = new THREE.Mesh(mergeGeos(standG), studentMat);
-        staticStand.visible=false; group.add(staticStand);
+      const counts = new Array(EX_VARIANTS).fill(0);
+      for (let i=0;i<pool.length;i++){
+        const v = i % EX_VARIANTS;
+        extras.push({ home:pool[i], v, slot:counts[v]++, seatRef:null, x:0, z:0,
+                      ry:Math.PI, speed:3.2, delay:0, exit:3.4,
+                      seated:false, leaving:false, out:false });
+      }
+      for (let v=0; v<EX_VARIANTS; v++){
+        const n = Math.max(1, counts[v]);
+        // the standing body is cloned: a geometry drawn both instanced and not
+        // confuses the renderer's attribute cache
+        const a = new THREE.InstancedMesh(buildSeated(), studentMat, n);
+        const b = new THREE.InstancedMesh(STUDENT_GEOS[rint(0,STUDENT_GEOS.length-1)].clone(), studentMat, n);
+        for (const m of [a,b]){
+          m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+          m.frustumCulled = false;        // the bounds are one boy, not the room he is in
+          group.add(m);
+        }
+        exSit.push(a); exStand.push(b);
       }
     })();
     // ---- teachers walking the aisles ----
@@ -3394,13 +3987,14 @@ const Hall = (function(){
     for (let i=0;i<8;i++){
       const m = new THREE.Mesh(buildSeated(), studentMat);
       m.position.set(STAGE_PREFECT_X0 + i*STAGE_SEAT_P, HALL.STAGE_Y+0.47, HALL.ZF-2.2);
-      m.rotation.y = Math.PI;
+      // their chairs have their backs to the black wall, so the boys look out over the hall
+      m.rotation.y = 0;
       group.add(m); prefects.push(m);
     }
     for (let i=0;i<STAGE_BACK_N;i++){
       const m = new THREE.Mesh(buildSeated(), studentMat);
       m.position.set(STAGE_BACK_X0 + i*STAGE_SEAT_P, HALL.STAGE_Y+0.47, HALL.ZF-3.7);
-      m.rotation.y = Math.PI;
+      m.rotation.y = 0;
       group.add(m); stageBoys.push(m);
     }
     deputy = new THREE.Mesh(buildDeputy(), studentMat); group.add(deputy);
@@ -3452,6 +4046,33 @@ const Hall = (function(){
     return best;
   }
 
+  /* ---- the folding wall across the back ----
+     Each leaf turns on its own hinge, and they do not all go at once: the two
+     in the middle lead and the ends follow, the way a real one gets pushed
+     back from the centre out. */
+  const BWM=new THREE.Matrix4(), BWQ=new THREE.Quaternion(), BWE=new THREE.Euler(),
+        BWS=new THREE.Vector3(1,1,1), BWP=new THREE.Vector3();
+  function writeBackWall(k){
+    if (!backLeaves) return;
+    const mid = (HALL_LEAF_N-1)/2, LAG = 0.42;
+    for (let i=0;i<HALL_LEAF_N;i++){
+      let t = (k - (Math.abs(i-mid)/mid)*LAG) / (1-LAG);
+      t = t<0 ? 0 : (t>1 ? 1 : t);
+      BWE.set(0, -(Math.PI/2)*(t*t*(3-2*t)), 0); BWQ.setFromEuler(BWE);
+      BWP.set(HALL_LEAF_X0 + i*HALL_LEAF_W, 0, HALL_LEAF_Z);
+      BWM.compose(BWP,BWQ,BWS);
+      backLeaves.setMatrixAt(i, BWM);
+    }
+    backLeaves.instanceMatrix.needsUpdate = true;
+  }
+  function stepBackWall(dt, open){
+    const to = open ? 1 : 0;
+    if (S.doorK === undefined) S.doorK = 0;
+    if (S.doorK === to) return;
+    const st = dt/3.6;                     // a heavy wall, and two boys pushing it
+    S.doorK = to > S.doorK ? Math.min(to, S.doorK+st) : Math.max(to, S.doorK-st);
+    writeBackWall(S.doorK);
+  }
   function setCurtain(t){
     const k = t*t*(3-2*t);
     for (const c of [curtainL, curtainR]){
@@ -3464,7 +4085,8 @@ const Hall = (function(){
     build();
     group.visible = true;
     setCurtain(0);
-    for (const s of seats) s.taken = s.pre;
+    S.doorK = 0; writeBackWall(0);           // shut for the assembly
+    for (const s of seats) s.taken = false;      // the hall starts empty; everyone walks in
     for (const a of crowd){
       do { a.x = rand(-12.5,12.5); a.z = rand(HALL.ZB-7.0, HALL.ZB-1.0); }
       while (Math.hypot(a.x-0, a.z-(HALL.ZB-1.6)) < 2.0);
@@ -3490,6 +4112,7 @@ const Hall = (function(){
     S.scoldWhy='';
     for (const t of staff){ t.busy=0; t.target=null; }
     setStaticStanding(false);
+    resetExtras();
     const kp = KEY_POOL.slice().sort(()=>Math.random()-0.5);
     S.standL = kp[0]; S.clapL = kp[1];
     S.standKey = 'Key'+S.standL; S.clapKey = 'Key'+S.clapL;
@@ -3639,8 +4262,114 @@ const Hall = (function(){
     if (lvl===2) setTimeout(()=>Audio_.sting(), 140);
   }
   function setStaticStanding(up){
-    if (staticSit) staticSit.visible = !up;
-    if (staticStand) staticStand.visible = up;
+    extrasUp = !!up;
+    writeExtras();          // the finale never calls stepExtras, so push it now
+  }
+  /* ---- the instanced half of the school ---------------------------------
+     One matrix each, per frame, only while somebody is moving.  A boy who is
+     not in the pose being drawn is scaled to nothing rather than removed —
+     cheaper than shuffling instance slots about. */
+  const EXM=new THREE.Matrix4(), EXQ=new THREE.Quaternion(), EXE=new THREE.Euler(),
+        EXS=new THREE.Vector3(1,1,1), EXP=new THREE.Vector3();
+  function writeExtras(){
+    if (!exSit.length) return;
+    let anySit=false, anyStand=false;
+    for (const e of extras){
+      const sm=exSit[e.v], tm=exStand[e.v];
+      if (e.out){ EXM.makeScale(0,0,0); sm.setMatrixAt(e.slot,EXM); tm.setMatrixAt(e.slot,EXM); continue; }
+      const s = e.seatRef;
+      if (e.seated && s && !extrasUp){
+        EXE.set(0,Math.PI,0); EXQ.setFromEuler(EXE); EXP.set(s.x,0.47,s.z);
+        EXM.compose(EXP,EXQ,EXS); sm.setMatrixAt(e.slot,EXM); anySit=true;
+        EXM.makeScale(0,0,0);     tm.setMatrixAt(e.slot,EXM);
+      } else {
+        const atSeat = e.seated && s;
+        EXE.set(0, atSeat?Math.PI:e.ry, 0); EXQ.setFromEuler(EXE);
+        EXP.set(atSeat?s.x:e.x, 0, atSeat?s.z-0.06:e.z);
+        EXM.compose(EXP,EXQ,EXS); tm.setMatrixAt(e.slot,EXM); anyStand=true;
+        EXM.makeScale(0,0,0);     sm.setMatrixAt(e.slot,EXM);
+      }
+    }
+    // a pose nobody is in still costs a vertex shader run per body, so drop it
+    for (let v=0;v<EX_VARIANTS;v++){
+      exSit[v].instanceMatrix.needsUpdate=true;   exSit[v].visible = anySit;
+      exStand[v].instanceMatrix.needsUpdate=true; exStand[v].visible = anyStand;
+    }
+  }
+  function extraSeatFor(e){
+    let best=null, bd=1e9;
+    for (const s of seats){
+      if (s.taken || s.prefect) continue;
+      const d = Math.hypot(s.x-e.x, s.z-e.z);
+      if (d<bd){ bd=d; best=s; }
+    }
+    return best;
+  }
+  function resetExtras(){
+    extrasUp=false; extrasOut=0;
+    for (const e of extras){
+      e.seatRef=e.home; e.seated=false; e.leaving=false; e.out=false; e.ry=Math.PI;
+      do { e.x=rand(-13.2,13.2); e.z=rand(HALL.ZB-7.6, HALL.ZB-1.1); }
+      while (Math.hypot(e.x, e.z-(HALL.ZB-1.6)) < 2.4);
+      e.delay = rand(0, 1.8);
+      // the far corners have to leg it, or the bell goes with boys still on their feet
+      e.speed = clamp(Math.hypot(e.home.x-e.x, e.home.z-e.z)/6.2, 2.8, 5.4);
+    }
+    extrasDirty=true; writeExtras();
+  }
+  function extrasExit(){
+    extrasUp=true;
+    for (const e of extras){
+      if (e.out) continue;
+      const s=e.seatRef;
+      if (e.seated && s){ e.x=s.x; e.z=s.z; s.taken=false; }
+      e.seated=false; e.leaving=true;
+      e.exit = e.x<0 ? -3.4 : 3.4;
+      e.speed = rand(2.4,3.4);
+      e.delay = (HALL.ROWS-1-(s?s.row:HALL.ROWS-1))*0.16 + rand(0,0.8);
+    }
+    extrasDirty=true; writeExtras();
+  }
+  // the finale wants the school already sat down, with no walking in first
+  function seatExtrasNow(){
+    extrasUp=false; extrasOut=0;
+    for (const e of extras){
+      const s=e.home;
+      e.seatRef=s; s.taken=true; e.seated=true; e.leaving=false; e.out=false;
+      e.x=s.x; e.z=s.z; e.ry=Math.PI; e.delay=0;
+    }
+    extrasDirty=true; writeExtras();
+  }
+  function stepExtras(dt){
+    let moved=false;
+    for (const e of extras){
+      if (e.out) continue;
+      if (e.delay>0){ e.delay-=dt; continue; }
+      if (e.leaving){
+        const dx=e.exit-e.x, dz=(HALL.ZB+0.9)-e.z, d=Math.hypot(dx,dz)||1;
+        const st=e.speed*dt;
+        e.x+=(dx/d)*st; e.z+=(dz/d)*st; e.ry=Math.atan2(dx,dz); moved=true;
+      } else if (!e.seated){
+        let s=e.seatRef;
+        if (!s || s.taken) s = e.seatRef = extraSeatFor(e);
+        if (!s) continue;
+        const dx=s.x-e.x, dz=s.z-e.z, d=Math.hypot(dx,dz)||1;
+        moved=true;
+        if (d<0.26){ s.taken=true; e.seated=true; e.x=s.x; e.z=s.z; e.ry=Math.PI; }
+        else { const st=Math.min(d, e.speed*dt);
+               e.x+=(dx/d)*st; e.z+=(dz/d)*st; e.ry=Math.atan2(dx,dz); }
+      } else continue;
+      // nobody walks through the boy holding the camera
+      if (!P.seated){
+        const px=e.x-P.x, pz=e.z-P.z, pd=Math.hypot(px,pz);
+        if (pd<0.80 && pd>1e-3){ const k=0.80-pd; e.x+=px/pd*k; e.z+=pz/pd*k; }
+      }
+      e.x = clamp(e.x, -HALL.W+0.7, HALL.W-0.7);
+      const gate = (Math.abs(e.x-3.4)<1.25 || Math.abs(e.x+3.4)<1.25);
+      e.z = clamp(e.z, HALL.ZF+1.2, gate ? HALL.ZB-0.20 : HALL.ZB-1.55);
+      if (e.leaving && gate && e.z > HALL.ZB-0.45){ e.out=true; extrasOut++; }
+    }
+    if (moved || extrasDirty){ writeExtras(); extrasDirty=false; }
   }
   function showKeyHint(again){
     showControlCue([[S.standL,'Stand'], [S.clapL,'Clap']], false, 'REMEMBER');
@@ -3667,8 +4396,10 @@ const Hall = (function(){
     }
   }
   return { build, reset, seats, crowd, S, P, seatAura, freeSeatFor, say, spawnWord, staff, setStaticStanding, showKeyHint,
+           extras, stepExtras, extrasExit, seatExtrasNow, get extrasOut(){ return extrasOut; },
            prefects, stageBoys, setVape, stepVape,
            popWordAtCrosshair, markWordUnderCrosshair, punish, clearWords, words, setCurtain, staffBusy,
+           stepBackWall, writeBackWall,
            get group(){ return group; }, get deputy(){ return deputy; },
            get head(){ return head; }, get recog(){ return recog; },
            get slide(){ return slide; }, get sideSlides(){ return sideSlides; },
@@ -3687,6 +4418,9 @@ function updateHall(dt){
   if (S.rehintAt>0){ S.rehintAt -= dt; if (S.rehintAt<=0 && !S.done && S.phase!=='leaving') Hall.showKeyHint(true); }
   if (S.hintT>0){ S.hintT -= dt; if (S.hintT<=0) $('keyCue').classList.add('hidden'); }
   updateHallRagdolls(dt);
+  Hall.stepExtras(dt);
+  // the deans let them go, and the back of the hall turns open behind them
+  Hall.stepBackWall(dt, S.phase==='dismiss' || S.phase==='leaving');
   if (S.phase==='vape' && S.vaper && S.vapeStep>=1 && S.vapeStep<3){
     const vx = S.vaper.position.x, vz = S.vaper.position.z;      // every head turns to the smoke
     for (const c of Hall.crowd){
@@ -4124,6 +4858,7 @@ function updateHall(dt){
   }
   else if (ph==='message'){
     if (!S.said1 && S.t>0.6){ S.said1=true;
+      hallSlideShow('closer');          // the slide he closes the assembly on
       Hall.say('HEADMASTER', 'I would like to close off with one message.', 3.4); }
     if (!S.said2 && S.t>4.4){ S.said2=true;
       Hall.say('HEADMASTER', S.closer, 6.0); }
@@ -4170,15 +4905,19 @@ function updateHall(dt){
     if (!S.exodus){
       S.exodus = true; S.outCount = 0;
       for (const a of crowd){
-        if (!a.seatRef) continue;
+        const s = a.seatRef;
         a.leaving=true; a.seated=false; a.out=false;
-        a.x=a.seatRef.x; a.z=a.seatRef.z; a.vx=0; a.vz=0;
+        // a boy who never found a seat leaves from wherever he ended up standing
+        if (s){ a.x=s.x; a.z=s.z; s.taken=false; }
+        a.vx=0; a.vz=0;
         a.mesh.geometry=a.standGeo; a.mesh.visible=true;
         a.exit = (a.x<0 ? -3.4 : 3.4);
         a.aggr = rand(0, 0.7);
         a.shoveCD = rand(0, 1.2);
-        a.leaveDelay = (HALL.ROWS-1-a.seatRef.row)*0.20 + rand(0, 0.55);
+        a.leaveDelay = (HALL.ROWS-1-(s?s.row:HALL.ROWS-1))*0.20 + rand(0, 0.55);
       }
+      if (P.seat) P.seat.taken=false;
+      Hall.extrasExit();
     }
     const gateP = (Math.abs(P.x-3.4)<1.25 || Math.abs(P.x+3.4)<1.25);
     if (gateP && P.z > HALL.ZB-0.45 && !S.done){
@@ -4257,7 +4996,8 @@ function animRecog(t){
     if (!r[i].visible) continue;
     r[i].position.set(lerp(x0+i*0.8, x1+i*1.05, k), lerp(0,HALL.STAGE_Y,k),
                       lerp(HALL.ZF+2.6, HALL.ZF-3.4, k));
-    r[i].rotation.y = Math.PI;
+    // they come up facing the stage and turn round on the way, so the hall gets their faces
+    r[i].rotation.y = Math.PI*(1-k);
   }
 }
 function endRecog(){ for (const m of Hall.recog) m.visible=false; }
@@ -5444,10 +6184,12 @@ function finishExam(){
 
 const buses = [makeBus(), makeBus()];
 const dblBus = makeBusDouble();
-const fleet = [buses[0], buses[1], dblBus];
+const elecBus = makeBusElectric();
+const fleet = [buses[0], buses[1], dblBus, elecBus];
 buses[0].group.position.set(-95, 0, BUS_Z);
 buses[1].group.position.set(-150, 0, BUS_Z);
 dblBus.group.position.set(-210, 0, BUS_Z);
+elecBus.group.position.set(-265, 0, BUS_Z);
 fleet.forEach(b=>{ b.setDoor(0); b.clearFront(); });
 
 // floating door marker
@@ -5559,6 +6301,29 @@ function foodCanvasMake(kind){
 const FOOD_CANVAS = {};
 function foodCanvas(k){ return FOOD_CANVAS[k] || (FOOD_CANVAS[k]=foodCanvasMake(k)); }
 
+/* The bands over the servery are composites — the wording off the real ones. */
+function tuckrSign(kind, w, h){
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  const g=c.getContext('2d');
+  g.fillStyle='#d0232a'; g.fillRect(0,0,w,h);
+  g.fillStyle='#ffffff'; g.textBaseline='middle';
+  const pad = h*0.30;
+  if (kind==='pickup'){
+    g.textAlign='left';
+    g.font='900 '+Math.round(h*0.52)+'px system-ui, sans-serif';
+    g.fillText('Online pick up', pad, h*0.54);
+    g.font='700 '+Math.round(h*0.30)+'px system-ui, sans-serif';
+    g.fillText('Years:', w*0.62, h*0.52);
+  } else {
+    g.textAlign='left';
+    g.font='900 '+Math.round(h*0.58)+'px system-ui, sans-serif';
+    g.fillText('order here', pad, h*0.55);
+  }
+  g.textAlign='right';
+  g.font='900 '+Math.round(h*0.46)+'px system-ui, sans-serif';
+  g.fillText('tuckr.', w-pad, h*0.56);
+  return new THREE.CanvasTexture(c);
+}
 function tuckrBand(txt, w, h){
   const c=document.createElement('canvas'); c.width=w; c.height=h;
   const g=c.getContext('2d');
@@ -5566,6 +6331,23 @@ function tuckrBand(txt, w, h){
   g.fillStyle='#ffffff'; g.textAlign='center'; g.textBaseline='middle';
   g.font='900 '+Math.floor(h*0.52)+'px system-ui, sans-serif';
   g.fillText(txt, w/2, h*0.55);
+  return new THREE.CanvasTexture(c);
+}
+function foodPosterTexture(kind){
+  const c=document.createElement('canvas'); c.width=256; c.height=340;
+  const g=c.getContext('2d');
+  g.fillStyle='#fbfaf7'; g.fillRect(0,0,256,340);
+  g.drawImage(foodCanvas(kind), 10, 44, 236, 168);
+  g.fillStyle='#d0232a'; g.fillRect(0,0,256,34);
+  g.fillStyle='#fff'; g.font='900 19px system-ui, sans-serif'; g.textAlign='center';
+  g.fillText('tuckr.', 128, 23);
+  g.fillStyle='#1a1a1a'; g.font='800 16px system-ui, sans-serif';
+  g.fillText(MENU[kind].short, 128, 240);
+  g.fillStyle='#d0232a'; g.font='900 24px system-ui, sans-serif';
+  g.fillText(MENU[kind].price, 128, 272);
+  g.fillStyle='#6a6a6a'; g.font='11px system-ui, sans-serif';
+  g.fillText('Order at the window or online', 128, 302);
+  g.fillText('Years 9 \u2013 13   \u00b7   12.45pm', 128, 320);
   return new THREE.CanvasTexture(c);
 }
 function menuBoardTexture(){
@@ -5590,61 +6372,128 @@ function menuBoardTexture(){
   return new THREE.CanvasTexture(c);
 }
 
-const C_CREAM=0xe9e4d4, C_CREAM_D=0xd6d0ba, C_DARK=0x2b3037, C_DARK_D=0x21262c,
-      C_RED=0xbf2026, C_WHITE=0xf2f2ec, C_TIMBER=0x9a8168, C_TIMBER_D=0x7d6a54;
+const C_CREAM=0xf2e6c2, C_CREAM_D=0xd6c795, C_DARK=0x2f353c, C_DARK_D=0x22272d,
+      C_RED=0xd8262b, C_RED_D=0xab171d, C_WHITE=0xfaf6e6, C_TIMBER=0xb08d5c,
+      C_TIMBER_D=0x8a6c42, C_STEEL=0xd2d8de, C_STEEL_D=0xa2a9b0;
+
+/* A gable end is the one thing on this block that refuses to be a box, so it
+   gets eight triangles of its own rather than a staircase of thin slabs. */
+function gableEnd(b, w, rise, d, colour, x, y, z){
+  const hw=w/2, hd=d/2;
+  const v=[ -hw,0, hd,   hw,0, hd,   0,rise, hd,
+             hw,0,-hd,  -hw,0,-hd,   0,rise,-hd,
+            -hw,0, hd,   0,rise,hd,  0,rise,-hd,   -hw,0,hd,  0,rise,-hd, -hw,0,-hd,
+             0,rise,hd,  hw,0, hd,   hw,0,-hd,      0,rise,hd, hw,0,-hd,   0,rise,-hd,
+            -hw,0,-hd,  hw,0,-hd,    hw,0, hd,     -hw,0,-hd,  hw,0, hd,  -hw,0, hd ];
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(v,3));
+  return b.push(g, colour, x, y, z);
+}
+/* Weatherboard reads off one proud lip per course; the wall behind does the colour. */
+function boards(b, w, x, y0, z, n, step, col){
+  for (let i=0;i<n;i++) b.box(w, 0.05, 0.055, col||C_CREAM_D, x, y0+i*step, z);
+}
+/* A steel rod between two points in the XY plane — bracing, mostly. */
+function rodXY(b, x0,y0, x1,y1, z, t, col){
+  const dx=x1-x0, dy=y1-y0;
+  b.box(t, Math.hypot(dx,dy), t, col, (x0+x1)/2, (y0+y1)/2, z, 0,0, -Math.atan2(dx,dy));
+}
+/* ...and one in the YZ plane, for the stays that hold the awning up. */
+function rodYZ(b, x, y0,z0, y1,z1, t, col){
+  const dy=y1-y0, dz=z1-z0;
+  b.box(t, Math.hypot(dy,dz), t, col, x, (y0+y1)/2, (z0+z1)/2, Math.atan2(dz,dy), 0, 0);
+}
 
 /* ---- the canteen block itself ---- */
 function buildCanteenShell(){
   const b = new Builder();
   const W0=-15.5, W1=13.5, ZB=-8.5, ZF=LUN.WALL_Z;       // footprint
   const cx=(W0+W1)/2, cw=(W1-W0);
+  const UP_Z = (ZF+ZB)/2 - 0.1, UP_D = (ZF-ZB)-0.5;      // upper storey, set back a touch
+  const UF = UP_Z + UP_D/2;                              // its front face
+  const UY0 = 3.335, UY1 = 6.385;                        // and its floor and eaves lines
+  const CLAD = -4.9;                                     // upstairs the charcoal starts where the gable stops
   // ---- lower storey: hollow, so there is a servery to look into ----
   const RB = -3.2;                                   // back wall of the servery room
   b.box(cw, 3.30, (RB-ZB), C_DARK, cx, 1.65, (RB+ZB)/2);        // solid depth behind the room
   b.box(0.55, 3.30, (ZF-RB), C_DARK, W0+0.27, 1.65, (ZF+RB)/2); // room side walls
   b.box(0.55, 3.30, (ZF-RB), C_DARK, W1-0.27, 1.65, (ZF+RB)/2);
   b.box(cw, 0.30, (ZF-RB), C_DARK, cx, 3.45, (ZF+RB)/2);        // roof over the room
-  b.box(0.06, 3.30, 1.30, C_RED, 6.55, 1.65, ZF-0.62);
+  b.box(0.06, 3.30, 1.30, C_RED, 6.55, 1.65, ZF-0.62);          // red reveal round the staff door
   b.box(1.30, 3.30, 0.06, C_RED, 7.20, 1.65, ZF-0.02);
-  // ---- upper storey: cream weatherboard, set back a touch ----
-  b.box(cw-0.5, 3.05, (ZF-ZB)-0.5, C_CREAM, cx, 4.86, (ZF+ZB)/2 - 0.1);
-  for (let i=0;i<11;i++)                                  // weatherboard shadow lines
-    b.box(cw-0.44, 0.035, 0.04, C_CREAM_D, cx, 3.52+i*0.28, ZF-0.28);
-  // gable end over the left half, like the photo
-  b.box(9.0, 1.55, 6.4, C_CREAM, -9.6, 7.05, ZF-3.8);
-  b.box(9.3, 0.16, 6.7, C_WHITE, -9.6, 7.90, ZF-3.8);
-  b.box(9.3, 0.10, 0.20, C_WHITE, -9.6, 7.30, ZF-0.62);
-  for (let i=0;i<5;i++) b.box(8.6,0.035,0.04, C_CREAM_D, -9.6, 6.40+i*0.28, ZF-0.60);
-  // steel cross-braces on the gable
-  for (const sx of [-12.6,-6.6]){
-    b.box(0.075, 3.05, 0.075, 0x9aa0a8, sx, 6.55, ZF-0.55, 0,0, 0.42);
-    b.box(0.075, 3.05, 0.075, 0x9aa0a8, sx, 6.55, ZF-0.55, 0,0,-0.42);
+  b.box(0.90, 2.10, 0.10, C_WHITE, 7.55, 1.47, ZF+0.02);        // the white door itself
+  b.box(0.94, 0.10, 0.14, C_WHITE, 7.55, 2.56, ZF+0.03);
+
+  // ---- upper storey: cream weatherboard on the left, charcoal cladding on the right ----
+  b.box(CLAD-W0, UY1-UY0, UP_D, C_CREAM, (W0+CLAD)/2, (UY0+UY1)/2, UP_Z);
+  b.box(W1-CLAD, UY1-UY0, UP_D, C_DARK,  (CLAD+W1)/2, (UY0+UY1)/2, UP_Z);
+  boards(b, (CLAD-W0)-0.4, (W0+CLAD)/2, UY0+0.22, UF+0.03, 11, 0.26);
+  // vertical corrugated cladding under and around the window run
+  for (let x=CLAD+0.17; x<W1; x+=0.34)
+    b.box(0.17, 1.05, 0.05, C_DARK_D, x, UY0+0.55, UF+0.03);
+  b.box(W1-CLAD, 0.12, 0.14, C_STEEL_D, (CLAD+W1)/2, UY0+1.10, UF+0.04);  // sill flashing
+
+  // ---- upper window band: white frames, split by a red stripe ----
+  function upperWin(x){
+    b.box(1.62, 1.42, 0.10, 0x22323f, x, 5.20, UF-0.05);         // glass
+    b.box(1.76, 0.11, 0.15, C_WHITE, x, 5.98, UF+0.01);
+    b.box(1.76, 0.11, 0.15, C_WHITE, x, 4.42, UF+0.01);
+    b.box(0.11, 1.56, 0.15, C_WHITE, x-0.87, 5.20, UF+0.01);
+    b.box(0.11, 1.56, 0.15, C_WHITE, x+0.87, 5.20, UF+0.01);
+    b.box(1.62, 0.08, 0.14, C_WHITE, x, 5.28, UF+0.01);          // transom
   }
+  for (let i=0;i<5;i++) upperWin(-3.9 + i*1.85);
+  for (let i=0;i<4;i++) upperWin( 6.65 + i*1.85);
+  b.box(1.50, UY1-UY0, 0.13, C_RED, 5.15, (UY0+UY1)/2, UF+0.02);  // the red stripe
+  b.box(0.10, UY1-UY0, 0.15, C_RED_D, 5.88, (UY0+UY1)/2, UF+0.03);
+  b.box(cw, 0.42, 0.18, C_WHITE, cx, UY1-0.20, UF+0.02);          // fascia over the windows
+  b.box(cw+0.5, 0.22, UP_D+0.5, C_WHITE, cx, UY1+0.11, UP_Z);     // eaves
+
+  // ---- the gable pop-up over the left third ----
+  const GX=-10.0, GW=10.0, GR=1.80, GD=6.2, GZ=ZF-3.3;
+  const GF = GZ + GD/2;                                           // gable front face
+  gableEnd(b, GW, GR, GD, C_CREAM, GX, UY1, GZ);
+  for (let i=0;i<6;i++){                                          // boards stop at the rake
+    const y = 0.16 + i*0.26;
+    b.box(GW*(1-y/GR)-0.34, 0.05, 0.055, C_CREAM_D, GX, UY1+y, GF+0.04);
+  }
+  const GA = Math.atan2(GR, GW/2), GL = Math.hypot(GW/2, GR);
+  b.box(GL+0.12, 0.14, GD+0.45, C_WHITE, GX-GW/4, UY1+GR/2+0.13, GZ, 0,0, GA);   // roof planes
+  b.box(GL+0.12, 0.14, GD+0.45, C_WHITE, GX+GW/4, UY1+GR/2+0.13, GZ, 0,0,-GA);
+  b.box(GL+0.12, 0.18, 0.20, C_WHITE, GX-GW/4, UY1+GR/2+0.02, GF+0.14, 0,0, GA); // barge boards
+  b.box(GL+0.12, 0.18, 0.20, C_WHITE, GX+GW/4, UY1+GR/2+0.02, GF+0.14, 0,0,-GA);
+  b.box(GW+0.30, 0.18, 0.24, C_WHITE, GX, UY1-0.04, GF+0.12);                    // eave board
+  b.box(0.34, 0.14, GD+0.50, C_WHITE, GX, UY1+GR+0.08, GZ);                      // ridge cap
+  // steel cross-bracing, inscribed in the gable so nothing pokes out at the sky
+  rodXY(b, GX-4.7, UY1+0.10, GX+0.7, UY1+1.52, GF+0.08, 0.075, C_STEEL);
+  rodXY(b, GX+4.7, UY1+0.10, GX-0.7, UY1+1.52, GF+0.08, 0.075, C_STEEL);
+  b.box(0.075, GR-0.18, 0.075, C_STEEL, GX, UY1+(GR-0.18)/2, GF+0.09);
+  rodXY(b, -4.6, UY0+0.25, 1.4, UY1-0.35, UF+0.12, 0.07, C_STEEL_D);
+  rodXY(b,  6.6, UY0+0.25, 12.4, UY1-0.35, UF+0.12, 0.07, C_STEEL_D);
   // downpipes
-  for (const sx of [-5.1, 12.0]) b.box(0.13,7.4,0.13, C_WHITE, sx, 3.7, ZF-0.10);
-  // ---- upper window band, right-hand side ----
-  for (let i=0;i<9;i++){
-    const x = -3.4 + i*1.85;
-    b.box(1.62, 1.42, 0.10, 0x1a2a38, x, 5.20, ZF-0.16);         // glass
-    b.box(1.74, 0.10, 0.14, C_WHITE, x, 5.96, ZF-0.14);
-    b.box(1.74, 0.10, 0.14, C_WHITE, x, 4.44, ZF-0.14);
-    b.box(0.10, 1.54, 0.14, C_WHITE, x-0.86, 5.20, ZF-0.14);
-    b.box(0.10, 1.54, 0.14, C_WHITE, x+0.86, 5.20, ZF-0.14);
-    b.box(1.62, 0.07, 0.13, C_WHITE, x, 5.20, ZF-0.14);
+  for (const sx of [-4.9, 12.6]){
+    b.cyl(0.085,0.085,6.30,8, C_WHITE, sx, 3.05, UF+0.14);
+    b.box(0.17,0.16,0.17, C_WHITE, sx, 6.28, UF+0.14);
   }
-  b.box(1.30, 3.05, 0.12, C_RED, 4.30, 4.86, ZF-0.15);           // red panel between windows
-  // ---- corrugated awning over the servery ----
-  for (let i=0;i<38;i++){
-    const z = ZF + 0.10 + i*0.062;
-    const k = i/37;
-    b.box(20.0, 0.055, 0.068, i%2? 0xb9bfc6 : 0xd6dbe1, -1.4, 3.46 - k*0.62, z);
-  }
-  b.box(20.2, 0.12, 0.16, C_WHITE, -1.4, 3.50, ZF+0.08);
-  b.box(20.2, 0.14, 0.16, C_WHITE, -1.4, 2.86, ZF+2.42);
-  for (const sx of [-10.6, -1.4, 7.4])                            // awning struts
-    b.box(0.09, 0.09, 2.5, 0x9aa0a8, sx, 3.20, ZF+1.28, 0.25,0,0);
+
+  // ---- corrugated galvanised awning over the servery ----
+  const AW0=-13.7, AW1=10.9, AWW=AW1-AW0, AWC=(AW0+AW1)/2;
+  const AZ0=ZF+0.06, AZ1=ZF+2.84, AD=AZ1-AZ0, ATILT=Math.atan2(0.28, AD);
+  b.box(AWW, 0.09, AD, C_STEEL_D, AWC, 3.28, (AZ0+AZ1)/2, ATILT);      // the sheet
+  for (let x=AW0+0.20; x<AW1; x+=0.40)                                 // and its ribs
+    b.box(0.16, 0.075, AD, C_STEEL, x, 3.34, (AZ0+AZ1)/2, ATILT);
+  b.box(AWW-0.10, 0.05, AD-0.12, C_WHITE, AWC, 3.22, (AZ0+AZ1)/2, ATILT);  // white soffit
+  b.box(AWW+0.25, 0.22, 0.16, C_WHITE, AWC, 3.10, AZ1+0.05);           // outer fascia
+  b.box(AWW+0.25, 0.16, 0.22, C_WHITE, AWC, 3.50, AZ0);                // flashing at the wall
+  b.box(AWW, 0.10, 0.10, C_STEEL_D, AWC, 3.20, AZ1-0.10);              // outer rail the stays pull on
+  for (const sx of [-11.6, -6.4, -1.2, 4.0, 9.2])
+    rodYZ(b, sx, 3.25, AZ1-0.14, 4.42, ZF-0.28, 0.065, C_STEEL_D);     // stays back to the upper wall
+  b.box(AWW+0.4, 0.34, 0.22, C_WHITE, AWC, 3.66, ZF-0.02);             // fascia above the awning
+
   // ---- the servery wall + three windows ----
-  b.box(24.0, 1.06, 0.34, C_WHITE, -1.4, LUN.DECK_H+0.53, ZF+0.02);   // counter under the windows
+  b.box(19.1, 1.06, 0.34, C_CREAM, -3.85, LUN.DECK_H+0.53, ZF+0.02);  // counter under the windows
+  b.box(4.9, 1.06, 0.34, C_DARK,    8.15, LUN.DECK_H+0.53, ZF+0.02);
+  boards(b, 19.0, -3.85, LUN.DECK_H+0.20, ZF+0.205, 4, 0.24);
   b.box(24.0, 0.09, 0.44, 0xe7e7e0, -1.4, LUN.DECK_H+1.07, ZF+0.02);  // counter lip
   for (const wx of LUN.WIN){                                        // frames only — the openings are real
     b.box(1.76, 0.11, 0.22, C_WHITE, wx, LUN.DECK_H+2.46, ZF+0.03);
@@ -5659,79 +6508,151 @@ function buildCanteenShell(){
     edges.push(12.6);
     for (let i=0;i<edges.length;i+=2){
       const x0=edges[i], x1=edges[i+1];
-      if (x1-x0 > 0.02) b.box(x1-x0, h, 0.20, C_WHITE, (x0+x1)/2, y, z);
+      if (x1-x0 <= 0.02) continue;
+      const cream = (x0+x1)/2 < 5.5;
+      b.box(x1-x0, h, 0.20, cream?C_CREAM:C_DARK, (x0+x1)/2, y, z);
+      if (cream && x1-x0 > 0.9) boards(b, (x1-x0)-0.12, (x0+x1)/2, y-0.56, z+0.11, 5, 0.26);
     }
-    b.box(24.0, 0.34, 0.20, C_WHITE, -1.4, y+0.88, z);              // header above the openings
+    b.box(18.9, 0.34, 0.20, C_CREAM, -3.95, y+0.88, z);             // header above the openings
+    b.box(7.1,  0.34, 0.20, C_DARK,   9.05, y+0.88, z);
   })();
+
+  // the return where the servery meets the wing — a black slab was showing here
+  b.box(2.2, 3.58, 0.22, C_CREAM, -14.5, 1.79, ZF+0.06);
+  boards(b, 2.0, -14.5, 0.34, ZF+0.20, 12, 0.26);
+  b.box(2.4, 0.24, 0.26, C_WHITE, -14.5, 3.66, ZF+0.08);
   // ---- the raised timber deck ----
   b.box(24.4, LUN.DECK_H, (LUN.DECK_Z-ZF)+0.5, C_TIMBER, -1.4, LUN.DECK_H/2, (LUN.DECK_Z+ZF)/2);
   for (let i=0;i<15;i++)
-    b.box(24.4, 0.02, 0.035, C_TIMBER_D, -1.4, LUN.DECK_H+0.005, ZF+0.12+i*0.11);
+    b.box(24.4, 0.035, 0.05, 0x6d5334, -1.4, LUN.DECK_H+0.002, ZF+0.12+i*0.11);
   b.box(24.4, 0.30, 0.10, C_TIMBER_D, -1.4, 0.14, LUN.DECK_Z+0.22);   // deck skirt
+  for (let i=0;i<9;i++)                                               // the boarded-in edge below it
+    b.box(0.05, 0.34, 0.05, C_TIMBER_D, -13.0+i*3.0, 0.17, LUN.DECK_Z+0.28);
   // ---- railings, with the gap the whole school has to squeeze through ----
   function rail(x0,x1){
     const w=x1-x0, mx=(x0+x1)/2;
-    b.box(w, 0.09, 0.09, C_TIMBER_D, mx, LUN.DECK_H+0.92, LUN.DECK_Z+0.16);
-    b.box(w, 0.07, 0.07, C_TIMBER_D, mx, LUN.DECK_H+0.52, LUN.DECK_Z+0.16);
+    b.box(w, 0.10, 0.11, C_TIMBER_D, mx, LUN.DECK_H+0.94, LUN.DECK_Z+0.16);
+    b.box(w, 0.06, 0.07, C_TIMBER_D, mx, LUN.DECK_H+0.62, LUN.DECK_Z+0.16);
+    b.box(w, 0.06, 0.07, C_TIMBER_D, mx, LUN.DECK_H+0.30, LUN.DECK_Z+0.16);
     const n=Math.max(2, Math.round(w/1.35));
     for (let i=0;i<=n;i++)
-      b.box(0.11, 0.98, 0.11, C_TIMBER, x0+(w*i/n), LUN.DECK_H+0.49, LUN.DECK_Z+0.16);
+      b.box(0.13, 0.98, 0.13, C_TIMBER, x0+(w*i/n), LUN.DECK_H+0.49, LUN.DECK_Z+0.16);
   }
   rail(-13.6, -LUN.GAP); rail(LUN.GAP, 10.6);
   // steps up through the gap
-  for (let i=0;i<3;i++)
+  for (let i=0;i<3;i++){
     b.box(LUN.GAP*2+0.4, 0.14, 0.30, C_TIMBER, 0, 0.07+i*0.14, LUN.DECK_Z+0.46-i*0.30);
-  // a ramp on the right, like the photo
-  b.box(2.2, 0.10, 2.6, C_TIMBER, 8.9, LUN.DECK_H-0.05, LUN.DECK_Z+1.10, -0.16,0,0);
-  b.box(2.4, 0.08, 0.08, C_TIMBER_D, 8.9, LUN.DECK_H+0.70, LUN.DECK_Z+0.30);
-  // ---- neighbouring block off to the right ----
-  b.box(11.0, 4.6, 7.0, C_DARK, 20.5, 2.30, ZF-3.0);
-  b.box(11.2, 0.20, 7.2, C_WHITE, 20.5, 4.70, ZF-3.0);
-  for (let i=0;i<5;i++) b.box(1.5,1.2,0.10, 0x1a2a38, 16.6+i*1.9, 3.30, ZF+0.44);
-  b.box(0.8, 4.6, 0.12, C_RED, 15.4, 2.30, ZF+0.46);
+    b.box(LUN.GAP*2+0.4, 0.03, 0.05, C_TIMBER_D, 0, 0.14+i*0.14, LUN.DECK_Z+0.60-i*0.30);
+  }
+  // a ramp on the right, like the photo — railed off, so the steps stay the only way up
+  b.box(2.2, 0.10, 2.9, C_TIMBER, 8.9, LUN.DECK_H-0.06, LUN.DECK_Z+1.20, -0.15,0,0);
+  for (const rz of [LUN.DECK_Z+0.30, LUN.DECK_Z+2.20]){
+    const ry = rz > LUN.DECK_Z+1.0 ? 0.30 : 0.68;
+    b.box(2.4, 0.08, 0.08, C_TIMBER_D, 8.9, LUN.DECK_H+ry+0.24, rz);
+    b.box(2.4, 0.06, 0.06, C_TIMBER_D, 8.9, LUN.DECK_H+ry-0.06, rz);
+  }
+  for (const rx of [7.75, 10.05])
+    b.box(0.11, 0.92, 0.11, C_TIMBER, rx, LUN.DECK_H+0.34, LUN.DECK_Z+1.20);
+
+  // ---- the lower wing that runs off to the left, glazed, its own corrugated lid ----
+  b.box(11.0, 3.30, (ZF-ZB), C_DARK_D, -21.0, 1.65, (ZF+ZB)/2);
+  b.box(11.0, 0.60, (ZF-ZB), C_CREAM, -21.0, 3.55, (ZF+ZB)/2);
+  for (let i=0;i<5;i++){
+    const x = -25.4 + i*2.15;
+    b.box(1.86, 1.80, 0.10, 0x5d6b78, x, 2.05, ZF+0.02);
+    b.box(2.00, 0.10, 0.16, C_WHITE, x, 3.00, ZF+0.06);
+    b.box(2.00, 0.10, 0.16, C_WHITE, x, 1.10, ZF+0.06);
+    b.box(0.12, 1.94, 0.16, C_WHITE, x-1.00, 2.05, ZF+0.06);
+    b.box(0.12, 1.94, 0.16, C_WHITE, x+1.00, 2.05, ZF+0.06);
+    b.box(1.86, 0.08, 0.15, C_WHITE, x, 2.36, ZF+0.06);
+  }
+  b.box(11.2, 0.18, (ZF-ZB)+0.6, C_STEEL_D, -21.0, 3.92, (ZF+ZB)/2 + 0.30, 0.10);
+  for (let x=-26.4; x<-15.5; x+=0.40)
+    b.box(0.16, 0.07, (ZF-ZB)+0.6, C_STEEL, x, 3.99, (ZF+ZB)/2 + 0.30, 0.10);
+  b.box(11.4, 0.20, 0.20, C_WHITE, -21.0, 3.90, ZF+0.52);
+  // ---- neighbouring block off to the right, the same kit of parts ----
+  b.box(11.0, 2.60, 7.0, C_DARK, 20.5, 1.30, ZF-3.0);
+  for (let i=0;i<4;i++){
+    const x=16.4+i*1.85;
+    b.box(1.60, 1.40, 0.10, 0x3f4a53, x, 1.60, ZF+0.46);
+    b.box(1.74, 0.10, 0.14, C_WHITE, x, 2.34, ZF+0.50);
+    b.box(0.10, 1.54, 0.14, C_WHITE, x-0.86, 1.60, ZF+0.50);
+    b.box(0.10, 1.54, 0.14, C_WHITE, x+0.86, 1.60, ZF+0.50);
+  }
+  b.box(11.2, 0.24, 0.18, C_WHITE, 20.5, 2.52, ZF+0.52);
+  b.box(11.0, 3.00, 7.0, C_CREAM, 20.5, 4.10, ZF-3.0);
+  boards(b, 10.6, 20.5, 2.90, ZF+0.54, 9, 0.26);
+  for (let i=0;i<4;i++){
+    const x=16.4+i*1.85;
+    b.box(1.60, 1.30, 0.10, 0x22323f, x, 4.30, ZF+0.46);
+    b.box(1.74, 0.10, 0.14, C_WHITE, x, 4.99, ZF+0.50);
+    b.box(1.74, 0.10, 0.14, C_WHITE, x, 3.61, ZF+0.50);
+    b.box(0.10, 1.44, 0.14, C_WHITE, x-0.86, 4.30, ZF+0.50);
+    b.box(0.10, 1.44, 0.14, C_WHITE, x+0.86, 4.30, ZF+0.50);
+  }
+  b.box(0.9, 3.0, 0.14, C_RED, 15.2, 4.10, ZF+0.50);
+  b.box(0.9, 3.0, 0.14, C_RED, 24.6, 4.10, ZF+0.50);
+  b.box(11.4, 0.20, 7.3, C_WHITE, 20.5, 5.68, ZF-3.0);
+  for (let x=15.2; x<26.0; x+=0.40) b.box(0.16,0.07,7.2, C_STEEL, x, 5.80, ZF-3.0);
+  b.box(11.6, 0.26, 0.20, C_WHITE, 20.5, 5.72, ZF+0.56);
   return b.build();
 }
 function buildCourtyardProps(){
   const b = new Builder();
-  // wheelie bin
+  // the green wheelie bin at the foot of the ramp
   b.box(0.72,0.98,0.62, 0x2f6b3a, 12.2, 0.49, LUN.DECK_Z+1.4);
+  b.box(0.68,0.06,0.58, 0x275931, 12.2, 0.80, LUN.DECK_Z+1.4);
   b.box(0.76,0.10,0.66, 0xd8d33a, 12.2, 1.02, LUN.DECK_Z+1.4);
+  b.box(0.30,0.05,0.06, 0xd8d33a, 12.2, 0.94, LUN.DECK_Z+1.10);
   b.cyl(0.12,0.12,0.09,8, 0x1b1b1b, 11.95, 0.10, LUN.DECK_Z+1.62, 0,0,1.5708);
   b.cyl(0.12,0.12,0.09,8, 0x1b1b1b, 12.45, 0.10, LUN.DECK_Z+1.62, 0,0,1.5708);
-  // two timber-clad waste stations
-  for (const sx of [-7.6, -12.4]){          // clear of the steps — nothing blocks the funnel
-    b.box(0.62,1.05,0.62, C_TIMBER, sx, 0.52, LUN.DECK_Z+1.15);
-    b.box(0.66,0.12,0.66, 0x33383f, sx, 1.10, LUN.DECK_Z+1.15);
-    b.box(0.20,0.22,0.02, 0x2f7ac4, sx-0.14, 0.72, LUN.DECK_Z+0.83);
-    b.box(0.20,0.22,0.02, 0x2f7ac4, sx+0.14, 0.72, LUN.DECK_Z+0.83);
+  // waste stations: charcoal body, wood-grain wrap, dark hood
+  for (const sx of [-7.6, -12.4, 6.2]){     // clear of the steps — nothing blocks the funnel
+    const bz = LUN.DECK_Z+1.15, bf = bz+0.335;
+    b.box(0.64,1.06,0.64, 0x30363d, sx, 0.53, bz);
+    b.box(0.60,0.62,0.03, 0x9a6f3c, sx, 0.36, bf);                    // the wood-grain wrap
+    for (let i=0;i<5;i++) b.box(0.60,0.02,0.025, 0x7d5729, sx, 0.10+i*0.14, bf+0.01);
+    b.box(0.68,0.14,0.68, 0x23282e, sx, 1.13, bz);
+    b.box(0.19,0.23,0.03, 0x14171a, sx-0.15, 0.87, bf);               // the two apertures
+    b.box(0.19,0.23,0.03, 0x14171a, sx+0.15, 0.87, bf);
+    b.box(0.30,0.10,0.03, 0xe8e8e2, sx, 0.72, bf);                    // the WASTE strip
   }
   // light pole
-  b.cyl(0.10,0.12,6.4,8, 0x9aa0a8, -14.8, 3.2, LUN.DECK_Z+1.0);
+  b.cyl(0.10,0.12,6.4,8, C_STEEL_D, -14.8, 3.2, LUN.DECK_Z+1.0);
   b.box(0.5,0.16,0.34, 0xd8dce1, -14.8, 6.32, LUN.DECK_Z+0.72);
-  // picnic tables out on the turf
-  for (const p of [[-9.5,12.0,0.25],[3.5,13.4,-0.2],[13.0,10.5,0.5]]){
+  // picnic tables — planked tops, A-frame legs, weathered right through
+  for (const p of [[-10.0,8.6,0.18],[-3.0,13.6,-0.24],[8.0,12.2,0.42],[14.5,9.0,-0.5]]){
     const [px,pz,ry]=p;
     const t=new Builder();
-    t.box(2.30,0.09,0.72, C_TIMBER, 0, 0.74, 0);
-    t.box(2.30,0.08,0.30, C_TIMBER, 0, 0.44, 0.62);
-    t.box(2.30,0.08,0.30, C_TIMBER, 0, 0.44,-0.62);
-    for (const sx of [-0.95,0.95]){
-      t.box(0.09,0.78,0.09, C_TIMBER_D, sx, 0.39, 0.44, 0,0, 0.34);
-      t.box(0.09,0.78,0.09, C_TIMBER_D, sx, 0.39,-0.44, 0,0,-0.34);
+    for (let i=0;i<5;i++) t.box(2.30,0.07,0.13, i%2?C_TIMBER:C_TIMBER_D, 0, 0.74, -0.30+i*0.15);
+    for (const sz of [0.66,-0.66]){
+      t.box(2.30,0.07,0.14, C_TIMBER,   0, 0.44, sz-0.075);
+      t.box(2.30,0.07,0.14, C_TIMBER_D, 0, 0.44, sz+0.075);
+    }
+    for (const sx of [-0.92,0.92]){
+      t.box(0.10,0.86,0.10, C_TIMBER_D, sx, 0.38, 0.42, 0,0, 0.44);
+      t.box(0.10,0.86,0.10, C_TIMBER_D, sx, 0.38,-0.42, 0,0,-0.44);
+      t.box(0.09,0.09,1.55, C_TIMBER_D, sx, 0.44, 0);
     }
     const geo=t.build();
     geo.applyMatrix4(new THREE.Matrix4().makeRotationY(ry));
     geo.applyMatrix4(new THREE.Matrix4().makeTranslation(px,0,pz));
     b.g.push(geo);
   }
-  // turf strip across the front of the courtyard
-  b.box(46.0, 0.03, 9.0, 0x4f8f45, 0, 0.015, 20.5);
+  // the artificial turf, and the kerb that holds it in
+  for (let i=0;i<10;i++)
+    b.box(30.0, 0.05, 1.5, i%2 ? 0x5c9e3f : 0x69ad4a, -12.0, 0.025, 13.75+i*1.5);
+  b.box(14.0, 0.05, 7.0, 0x5c9e3f, 6.0, 0.025, 27.0);
+  b.box(30.4, 0.07, 0.22, 0x9aa0a6, -12.0, 0.035, 13.4);
+  b.box(0.22, 0.07, 15.0, 0x9aa0a6,   3.1, 0.035, 21.0);
+  b.box(14.0, 0.07, 0.22, 0x9aa0a6,   6.0, 0.035, 23.4);
   return b.build();
 }
 function buildLunchGround(){
   const b = new Builder();
-  b.box(60, 0.10, 46, 0x3d4147, 0, -0.05, 12.0);            // asphalt
-  for (let i=0;i<8;i++) b.box(0.16,0.012,4.2, 0x8b8f95, 20.5, 0.012, 6.5+i*2.4);  // carpark hatching
+  b.box(60, 0.10, 46, 0x51555b, 0, -0.05, 12.0);            // asphalt
+  for (let i=0;i<8;i++) b.box(0.16,0.012,4.2, 0x9ba0a6, 20.5, 0.012, 6.5+i*2.4);  // carpark hatching
+  b.box(0.16,0.012,20.0, 0x9ba0a6, 17.4, 0.012, 15.0);
   return b.build();
 }
 
@@ -5975,27 +6896,31 @@ const Lunch = (function(){
     kioskTap.position.set(LUN.KIOSK.x, LUN.KIOSK.y - 0.16, LUN.KIOSK.z - 0.10);
     kioskTap.visible = false;
     group.add(kioskTap);
-    // signage bands
-    function band(txt, w, h, x, y, z){
+    // signage bands — one red header per serving window, the way tuckr does it
+    function band(kind, w, h, x, y, z){
       const m = new THREE.Mesh(new THREE.PlaneGeometry(w,h),
-        new THREE.MeshBasicMaterial({map:tuckrBand(txt, Math.round(w*64), Math.round(h*64))}));
+        new THREE.MeshBasicMaterial({map:tuckrSign(kind, Math.round(w*80), Math.round(h*80))}));
       m.position.set(x, y, z); group.add(m); return m;
     }
-    band('online pick up', 4.6, 0.52, -8.2, LUN.DECK_H+2.62, LUN.WALL_Z+0.16);
-    band('tuckr.',         1.9, 0.52, -5.2, LUN.DECK_H+2.62, LUN.WALL_Z+0.16);
-    band('Order here',     4.6, 0.52, -1.0, LUN.DECK_H+2.62, LUN.WALL_Z+0.16);
-    band('tuckr.',         1.9, 0.52,  2.0, LUN.DECK_H+2.62, LUN.WALL_Z+0.16);
-    band('Order here',     4.6, 0.52,  5.4, LUN.DECK_H+2.62, LUN.WALL_Z+0.16);
+    band('pickup', 3.90, 0.44, LUN.WIN[0], LUN.DECK_H+2.64, LUN.WALL_Z+0.16);
+    band('order',  3.90, 0.44, LUN.WIN[1], LUN.DECK_H+2.64, LUN.WALL_Z+0.16);
+    band('order',  3.90, 0.44, LUN.WIN[2], LUN.DECK_H+2.64, LUN.WALL_Z+0.16);
+    band('pickup', 3.60, 0.42, -9.4, LUN.DECK_H+2.64, LUN.WALL_Z+0.16);
     for (const wx of LUN.WIN){
       const m=new THREE.Mesh(new THREE.PlaneGeometry(2.0,0.06),
         new THREE.MeshBasicMaterial({color:0xffd23f, transparent:true, opacity:0.55}));
       m.position.set(wx, LUN.DECK_H+1.10, LUN.WALL_Z+0.20); group.add(m);
     }
-    // menu boards either side of the middle window
-    for (const mx of [-2.15, 2.15]){
+    // printed menu boards either side of the middle window, and a food poster on the left
+    for (const mx of [-2.15, 2.15, 6.05]){
       const m=new THREE.Mesh(new THREE.PlaneGeometry(1.15,1.52),
         new THREE.MeshBasicMaterial({map:menuBoardTexture()}));
       m.position.set(mx, LUN.DECK_H+1.80, LUN.WALL_Z+0.14); group.add(m);
+    }
+    for (const [px,k] of [[-6.3,'katsu'],[-7.6,'bun']]){
+      const m=new THREE.Mesh(new THREE.PlaneGeometry(0.86,1.14),
+        new THREE.MeshBasicMaterial({map:foodPosterTexture(k)}));
+      m.position.set(px, LUN.DECK_H+1.76, LUN.WALL_Z+0.14); group.add(m);
     }
     // students
     for (let i=0;i<NPC_N;i++){
@@ -7474,7 +8399,9 @@ function startRound(){
   G.busIdx = (G.round-1)%2;
   G.isDouble = (Math.random() < 0.2);           // one bus in five is the NX2 double-decker
   G.topDeck = false;
-  G.bus = G.isDouble ? dblBus : buses[G.busIdx];
+  G.route = G.isDouble ? null : pickSchoolRoute();
+  // the 871 brings its own bus; the school runs share the pair of yellow ones
+  G.bus = G.isDouble ? dblBus : (G.route.ev ? elecBus : buses[G.busIdx]);
   G.targetBay = BAYS[rint(0,2)];
   G.doorX = G.targetBay + DOOR_LX;
   // a normal bus takes 20, the NX2 takes 30.  The seats are unchanged — 10 of them on a
@@ -7483,7 +8410,6 @@ function startRound(){
   G.boarded = 0; G.boardCD=0; G.doorT=0; G.boardTimer=0;
   G.rideSkip=false; G.tier=null; G.ridePose=null; G.auraSealed=false;
   G.busX = -95; G.busV = 13.2;
-  G.route = G.isDouble ? null : pickSchoolRoute();
   if (G.bus.setRoute && G.route) G.bus.setRoute(G.route);
   G.bus.setDoor(0); G.bus.releaseSeats(); G.bus.setBoarded(0);
   G.bus.group.position.set(G.busX, 0, BUS_Z);
@@ -7518,6 +8444,8 @@ function startRound(){
   $('busNum').textContent = '#'+G.round+(G.isDouble? ' · NX2' : ' · '+G.route.n);
   if (G.isDouble)
     banner('DOUBLE-DECKER INBOUND', 'NX2 \u2014 first two aboard get the front seat up top', 4200);
+  else if (G.route.ev)
+    banner('THE 871 INBOUND', 'Constellation via Forrest Hill Road — pick your spot', 3400);
   else
     banner('SCHOOL BUS '+G.route.n+' INBOUND', 'It will pull into one of the three bays — pick your spot', 3400);
   Audio_.bell();
@@ -7557,7 +8485,12 @@ function sealAura(){
   G.auraSealed = true;
   const au = computeAura();
   const ord = n => n+(n===1?'st':n===2?'nd':n===3?'rd':'th');
-  logAura('Caught bus #'+G.round+(G.isDouble ? ' \u2014 the NX2' : (G.route? ' \u2014 School Bus '+G.route.n : '')), au.bus);
+  // the 871 is a service bus, not a school run \u2014 name it the way the blind does
+  const busName = G.isDouble ? ' \u2014 the NX2'
+                : !G.route  ? ''
+                : G.route.ev ? ' \u2014 the '+G.route.n+' to '+G.route.dest
+                : ' \u2014 School Bus '+G.route.n;
+  logAura('Caught bus #'+G.round+busName, au.bus);
   logAura(ord(G.playerRank)+' through the doors', au.rank);
   if (au.teach) logAura('Queued properly for the duty teacher', au.teach);
   if (au.seat)  logAura(au.seatLabel, au.seat);
@@ -8296,7 +9229,7 @@ function updateCamera(dt){
     }
     camera.rotation.set(pitch + camShakeY, yaw + camShakeX, Math.sin(bobT*1.7)*0.012, 'YXZ');
     if (skyDome) skyDome.position.set(camera.position.x, LUNCH_Y, camera.position.z);
-    sun.position.set(camera.position.x-30, LUNCH_Y+34, camera.position.z-22);
+    sun.position.set(camera.position.x-26, LUNCH_Y+34, camera.position.z+26);
     sun.target.position.set(camera.position.x, LUNCH_Y, camera.position.z);
     sun.target.updateMatrixWorld();
     shoveAnim = Math.max(0, shoveAnim - dt*3.4);
@@ -8658,6 +9591,7 @@ function startFinale(kind, total){
     sun.intensity = 0.34; hemi.intensity = 0.34;
     for (const b of fleet) b.group.position.set(-400, 0, BUS_Z);
     Hall.reset();
+    Hall.seatExtrasNow();        // no walking in for this one; they are already sat down
     Hall.setCurtain(1);
     const S = Hall.S;
     S.phase = 'finale'; S.done = true; S.cap = ''; S.capT = 0;
@@ -8676,10 +9610,10 @@ function startFinale(kind, total){
     // Mr Fordham at the lectern, the headmaster waiting in the wings
     Hall.head.visible = true;
     Hall.head.position.set(0, HALL.STAGE_Y, HALL.ZF - 2.78);      // the headmaster, at the lectern
-    Hall.head.rotation.y = Math.PI;                                // addressing the hall
+    Hall.head.rotation.y = 0;                                      // addressing the hall
     Hall.deputy.visible = true;                                    // the deputy stands off to one side
     Hall.deputy.position.set(4.9, HALL.STAGE_Y, HALL.ZF - 3.15);
-    Hall.deputy.rotation.y = Math.PI - 0.30;
+    Hall.deputy.rotation.y = -0.30;
     yaw = Math.PI; pitch = -0.06;
     showControlCue([['WASD','Move'],['F','Cook']], true, 'ON STAGE');
     clearInputEdges();
@@ -9846,7 +10780,11 @@ if (__DEV) window.__BBB = { G, camera, buses, agents, scene, renderer, Audio_,
   detent(){ return {ejecting:+G.ejecting.toFixed(2), inDet:G.inDetention, t:+G.detention.toFixed(1),
                     barred:G.playerBarred, agents:agents.length, hasPlayer:agents.indexOf(player)>=0,
                     roomVisible:detention.group.visible, door:+detention.door.rotation.y.toFixed(2)}; },
-  detention, dblBus, fleet, DET_Y, Ride, scene, THREE, Hall, HALL, HALL_Y,
+  forceEV(){ G.isDouble=false; G.route=SCHOOL_ROUTES[SCHOOL_ROUTES.length-1]; G.bus=elecBus;
+             G.bus.setRoute(G.route); G.bus.clearFront(); G.spacesMax=G.spaces=BUS_CAP_SINGLE;
+             G.bus.releaseSeats(); G.bus.setBoarded(0); G.bus.group.position.set(G.busX,0,BUS_Z);
+             for (const b of fleet) if (b!==G.bus) b.group.position.set(-250,0,BUS_Z); },
+  detention, dblBus, elecBus, fleet, DET_Y, Ride, scene, THREE, Hall, HALL, HALL_Y,
   hallStep(dt){ G.total+=dt; updateHall(dt); },
   startHall(){ startAssembly(); },
   finishHall(){ finishAssembly(); },
