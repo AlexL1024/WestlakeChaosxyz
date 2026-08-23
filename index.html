@@ -320,6 +320,7 @@
     text-transform:uppercase; color:#7f9c8b; margin-bottom:7px; }
   #startTouch span { display:block; font-size:13.5px; font-weight:700; color:#cfe6d8; line-height:1.75; }
   #startTouch span em { font-style:normal; color:#3ddc84; }
+  #rGrade { line-height:1.08; }
   body.touch #keyCue { display:none !important; }
   body.touch #hallSit, body.touch #ridePrompt { display:none !important; }
   #tuiPad .tb.dim { opacity:.40; }
@@ -464,6 +465,8 @@
   .grade.gMer { color:#8fe0ac; }
   .grade.gExc { color:#3ddc84; }
   .grade.gSch { color:#2fae63; text-shadow:0 0 26px rgba(61,220,132,.85); }
+  .grade.gOut { color:#ffd23f; text-shadow:0 0 30px rgba(255,210,63,.9), 0 0 60px rgba(255,210,63,.4);
+    font-size:clamp(30px,7vw,54px); }
   #loadNote { position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
     background:#0a0f18; color:#8fa3c0; font-size:15px; letter-spacing:2px; z-index:30; }
 </style>
@@ -545,7 +548,7 @@
       <div class="dqOpts" id="dqOpts"></div>
       <div class="dqMark" id="dqMark"></div>
     </div>
-    <div class="detFoot" id="detFoot">Answer all four. Then you can go.</div>
+    <div class="detFoot" id="detFoot">Four correct answers and you can go.</div>
   </div>
 </div>
 <div id="lunchStock" class="hidden">
@@ -2459,6 +2462,35 @@ const BOARD_PREFECTS = { title:'SENIOR PREFECTS', rows:[
   { r:'ACADEMIC CAPTAIN', n:'MATTHEW HENG' },
   { r:'MUSIC CAPTAIN',    n:'HUGH REID' },
   { r:'SERVICE CAPTAIN',  n:'VINAY VARADARAJAN' } ] };
+/* THE GOLD AWARD — top of the school, all time.
+   The three below are the record holders as of today.  Anyone on the live
+   leaderboard who beats the standing record joins them automatically, so the
+   board on the wall keeps itself up to date. */
+const GOLD_SEED = [
+  { n:'MIKE Z',  a:258 },
+  { n:'ALEX',    a:240 },
+  { n:'WILLIAM', a:237 }
+];
+function goldRoll(){
+  const seedTop = GOLD_SEED[0].a;
+  const rows = (typeof LB !== 'undefined' && LB.rows) ? LB.rows : [];
+  const all = rows.filter(function(r){ return r.aura > seedTop; })
+                  .map(function(r){ return { n:String(r.name).toUpperCase(), a:r.aura }; })
+                  .concat(GOLD_SEED);
+  const seen = {}, out = [];
+  for (const g of all){
+    const k = g.n + '|' + g.a;
+    if (seen[k]) continue;
+    seen[k] = 1; out.push(g);
+  }
+  out.sort(function(x, y){ return y.a - x.a; });
+  return out.slice(0, 8);
+}
+/* the record to beat, captured before this run is added to the board */
+function goldRecord(){
+  return (G.record === undefined || G.record === null) ? GOLD_SEED[0].a : G.record;
+}
+
 const BOARD_SUPPORTERS = { title:'SUPPORTERS',
   rows:[ {n:'BEVIS JIANG'}, {n:'MIN-SEO BANG'}, {n:'MIGUEL CHAN'},
          {n:'EVAN LI'}, {n:'ROID KIM'} ] };
@@ -2528,6 +2560,80 @@ function paintHallLB(g){
   }
   g.textAlign = 'left';
 }
+let hallGold = null;
+/* everyone who has ever reached the top grade, newest board data */
+const OUTSTANDING_MIN = 260;
+function outstandingRoll(){
+  const rows = (typeof LB !== 'undefined' && LB.rows) ? LB.rows : [];
+  const seen = {}, out = [];
+  for (const r of rows){
+    if (r.aura < OUTSTANDING_MIN) continue;
+    const n = String(r.name).toUpperCase();
+    if (seen[n]) continue;
+    seen[n] = 1; out.push({ n: n, a: r.aura });
+  }
+  return out.slice(0, 5);
+}
+function paintHallGold(g){
+  const W = BOARD_W;
+  boardBase(g, 19);
+  boardHead(g, 'GOLD AWARD');
+  g.textAlign = 'center';
+  g.font = 'italic 600 23px Georgia, serif'; g.fillStyle = '#e9d6ac';
+  g.fillText('Top of the school', W/2, 414);
+
+  const roll = goldRoll().slice(0, 4);
+  const step = 128;
+  for (let i = 0; i < roll.length; i++){
+    const y = 496 + i*step;
+    const np = fitFont(g, roll[i].n, W - 150, 38, '800', 'Georgia, serif');
+    g.font = '800 ' + np + 'px Georgia, serif';
+    g.fillStyle = i === 0 ? '#ffd23f' : '#ffffff';
+    g.fillText(roll[i].n, W/2, y);
+    g.font = '700 25px Georgia, serif';
+    g.fillStyle = i === 0 ? '#ffd23f' : '#e9d6ac';
+    g.fillText(String(roll[i].a) + ' aura', W/2, y + 32);
+  }
+
+  // ---- the lower half: the Outstanding Scholarship roll ----
+  const ruleY = 1090;
+  g.strokeStyle = '#e2cfa6'; g.lineWidth = 2;
+  g.beginPath(); g.moveTo(70, ruleY); g.lineTo(W-70, ruleY); g.stroke();
+  spacedCaps(g, 'OUTSTANDING', W/2, ruleY + 52, 25, 2.0, '#ffffff', '800');
+  spacedCaps(g, 'SCHOLARSHIP', W/2, ruleY + 84, 25, 2.0, '#ffffff', '800');
+  g.textAlign = 'center';
+  g.font = 'italic 600 20px Georgia, serif'; g.fillStyle = '#e9d6ac';
+  g.fillText(OUTSTANDING_MIN + ' aura and above', W/2, ruleY + 118);
+
+  const outs = outstandingRoll();
+  if (!outs.length){
+    g.font = 'italic 600 24px Georgia, serif'; g.fillStyle = '#e9d6ac';
+    g.fillText('Nobody yet.', W/2, ruleY + 210);
+  } else {
+    for (let i = 0; i < outs.length; i++){
+      const y = ruleY + 200 + i*90;
+      const np = fitFont(g, outs[i].n, W - 150, 32, '800', 'Georgia, serif');
+      g.font = '800 ' + np + 'px Georgia, serif';
+      g.fillStyle = '#ffffff';
+      g.fillText(outs[i].n, W/2, y);
+      g.font = '700 22px Georgia, serif'; g.fillStyle = '#e9d6ac';
+      g.fillText(String(outs[i].a) + ' aura', W/2, y + 28);
+    }
+  }
+  g.textAlign = 'left';
+}
+function hallGoldTexture(){
+  const c = document.createElement('canvas'); c.width = BOARD_W; c.height = BOARD_H;
+  paintHallGold(c.getContext('2d'));
+  hallGold = { canvas: c, tex: new THREE.CanvasTexture(c) };
+  return hallGold.tex;
+}
+function repaintHallGold(){
+  if (!hallGold) return;
+  paintHallGold(hallGold.canvas.getContext('2d'));
+  hallGold.tex.needsUpdate = true;
+}
+
 function hallLBTexture(){
   const c = document.createElement('canvas'); c.width = BOARD_W; c.height = BOARD_H;
   paintHallLB(c.getContext('2d'));
@@ -2543,6 +2649,7 @@ function repaintHallLB(){
 function boardTexture(spec){
   const W = BOARD_W, H = BOARD_H;
   if (spec === 'leaderboard') return hallLBTexture();
+  if (spec === 'gold') return hallGoldTexture();
   const c = document.createElement('canvas'); c.width = W; c.height = H;
   const g = c.getContext('2d');
   boardBase(g, 1 + Math.floor(Math.random()*40));
@@ -3052,7 +3159,7 @@ const Hall = (function(){
     // and index 0 is the board nearest the stage
     const boards = [
       [ BOARD_SUPPORTERS, null, null, null, null ],
-      [ 'leaderboard', BOARD_DEVELOPERS, BOARD_PREFECTS, null, null ]
+      [ 'leaderboard', BOARD_DEVELOPERS, BOARD_PREFECTS, 'gold', null ]
     ];
     for (let side=0; side<2; side++){
       const sx = side ? 1 : -1;
@@ -5949,7 +6056,7 @@ function lunchBar(reason){
 function lunchDetentionStart(){
   fadeTo(()=>{
     Lunch.S.det = 30.0;            // only a backstop; the sheet is what lets you out
-    G.det = { batch: detNextBatch(), i:0, right:0, locked:false, done:false, until:0 };
+    G.det = { queue: detQueue(), right:0, asked:0, lastOk:false, locked:false, done:false, until:0 };
     Lunch.group.visible = false;
     detRoomEnter();
     pressure = 0; camShakeX = camShakeY = 0;
@@ -6819,24 +6926,29 @@ const DET_QS = [
     a:['Yes \u2014 it is fun lol', 'No \u2014 I would rather play westlakeboys.xyz'],
     c:0, why:'Yes. Say it like you mean it.' }
 ];
-const DET_PER_SIT = 4;
+/* Four RIGHT answers, not four answers.  Get one wrong and it goes to the back
+   of the pile — you will see it again, and by then you have been told what the
+   school wants to hear.  That is rather the point of a detention. */
+const DET_TARGET = 4;
 function detShuffle(){
   const o = DET_QS.map((_,i)=>i);
   for (let i=o.length-1;i>0;i--){ const j=rint(0,i); const t=o[i]; o[i]=o[j]; o[j]=t; }
   return o;
 }
-function detNextBatch(){
+function detQueue(){
   if (!G.detOrder || G.detAt >= G.detOrder.length){ G.detOrder = detShuffle(); G.detAt = 0; }
-  const batch = G.detOrder.slice(G.detAt, G.detAt + DET_PER_SIT);
-  G.detAt += batch.length;
-  return batch;
+  // start where the last detention left off, then wrap through the rest
+  const q = G.detOrder.slice(G.detAt).concat(G.detOrder.slice(0, G.detAt));
+  G.detAt += DET_TARGET;
+  return q;
 }
 function detShow(){
   const D = G.det;
-  const Q = DET_QS[D.batch[D.i]];
+  if (!D.queue.length) D.queue = detShuffle();
+  const Q = DET_QS[D.queue[0]];
   $('detSheet').classList.remove('hidden');
-  $('dqNum').textContent = 'Question ' + (D.i+1) + ' of ' + D.batch.length;
-  $('dqScore').textContent = D.right + '/' + D.batch.length;
+  $('dqNum').textContent = DET_TARGET + ' correct to leave';
+  $('dqScore').textContent = D.right + '/' + DET_TARGET;
   $('dqQ').textContent = Q.q;
   $('dqOpts').innerHTML = Q.a.map(function(t,i){
     return '<div class="dqOpt" data-i="'+i+'"><u>'+(i+1)+'</u><span>'+t+'</span></div>'; }).join('');
@@ -6850,8 +6962,8 @@ function detShow(){
 }
 function detAnswer(n){
   const D = G.det;
-  if (!D || D.locked || D.done) return;
-  const Q = DET_QS[D.batch[D.i]];
+  if (!D || D.locked || D.done || !D.queue.length) return;
+  const Q = DET_QS[D.queue[0]];
   if (n < 0 || n >= Q.a.length) return;
   D.locked = true;
   const ok = (n === Q.c);
@@ -6859,11 +6971,13 @@ function detAnswer(n){
   opts[n].classList.add(ok ? 'right' : 'wrong');
   if (!ok && opts[Q.c]) opts[Q.c].classList.add('right');
   const m = $('dqMark');
-  m.textContent = (ok ? 'CORRECT \u2014 ' : 'WRONG \u2014 ') + Q.why;
+  m.textContent = (ok ? 'CORRECT \u2014 ' : 'WRONG \u2014 ') + Q.why
+                + (ok ? '' : ' You will get this one again.');
   m.className = 'dqMark ' + (ok ? 'right' : 'wrong');
   // no aura in here — detention is its own punishment
   if (ok){ D.right++; Audio_.point(); } else Audio_.bump();
-  $('dqScore').textContent = D.right + '/' + D.batch.length;
+  D.lastOk = ok;
+  $('dqScore').textContent = D.right + '/' + DET_TARGET;
   D.until = performance.now() + 1900;
 }
 function detFinishRoom(){
@@ -6874,14 +6988,19 @@ function detStep(){
   const D = G.det;
   if (!D || D.done || !D.until) return;
   if (performance.now() < D.until) return;
-  D.until = 0; D.i++; D.locked = false;
-  if (D.i >= D.batch.length){
+  D.until = 0; D.locked = false;
+  // a right answer retires the question; a wrong one sends it to the back
+  const done = D.queue.shift();
+  if (!D.lastOk) D.queue.push(done);
+  D.asked++;
+  if (D.right >= DET_TARGET){
     D.done = true;
     $('detSheet').classList.add('hidden');
     $('dqMark').textContent = '';
     const f = $('detFoot');
-    if (f) f.textContent = 'Sheet in \u2014 ' + D.right + ' of ' + D.batch.length + ' right. Off you go.';
-    detFinishRoom();                       // four questions done, out you go
+    if (f) f.textContent = 'Four correct \u2014 it took you ' + D.asked
+      + (D.asked === 1 ? ' go' : ' goes') + '. Off you go.';
+    detFinishRoom();                       // four right, out you go
   } else detShow();
 }
 
@@ -6960,7 +7079,7 @@ function sendToDetention(reason){
 function startDetention(){
   fadeTo(()=>{
     G.inDetention = true; G.detention = 30.0;
-    G.det = { batch: detNextBatch(), i:0, right:0, locked:false, done:false, until:0 };
+    G.det = { queue: detQueue(), right:0, asked:0, lastOk:false, locked:false, done:false, until:0 };
     const i = agents.indexOf(player); if (i>=0) agents.splice(i,1);
     detRoomEnter();
     pressure = 0; camShakeX = camShakeY = 0;
@@ -7061,6 +7180,7 @@ const G = {
   teacherBay:0, qcounter:0, isDouble:false, topDeck:false,
   ejecting:0, inDetention:false, detention:0, detentions:0,
   det:null, detOrder:null, detAt:0,
+  record:null, recordSet:false,
   inLine:false, playerQPos:undefined, outOfLine:0, leaveHold:0, rejoinCD:0, everInLine:false,
   teacherAtBoard:false, aura:0, rideSkip:false, tier:null, ridePose:null,
   rideMode:false, rideS:0, rideA:0, rideDist:0, routeReady:false,
@@ -7091,6 +7211,7 @@ function applyAuraEntry(t, e){
   return t > 0 ? Math.round(t * e.mult) : t;
 }
 const AURA_GRADES = [
+  { min:260, name:'Outstanding Scholarship', cls:'gOut' },
   { min:150, name:'Scholarship', cls:'gSch' },
   { min:80,  name:'Excellence',  cls:'gExc' },
   { min:31,  name:'Merit',       cls:'gMer' },
@@ -8298,6 +8419,13 @@ function finScript(kind, total){
     put(t, 'MR FORDHAM', 'That is an AWESOME score. You get the scholarship tie.', 3.8); t += 4.0;
     put(t, 'MR FORDHAM', 'You serve as the absolute best role model for the school. Congratulations.', 4.4);
     L.tie = t + 0.4; t += 4.8;
+    if (total > goldRecord()){
+      put(t, 'MR FORDHAM', 'One more thing.', 2.4); t += 2.6;
+      put(t, 'MR FORDHAM', 'You are the absolute best student in the school.', 3.6); t += 3.8;
+      put(t, 'MR FORDHAM', 'As a result, your name is on the board for the GOLD AWARD.', 4.2);
+      L.gold = t + 0.3; t += 4.4;
+      put(t, 'MR FORDHAM', 'Congratulations.', 2.8); t += 3.0;
+    }
   } else {
     put(t, 'MR FORDHAM', 'THAT IS AWFUL. You are EXPELLED.', 3.6);
     L.walk = t + 1.4; t += 5.4;
@@ -8894,7 +9022,12 @@ async function lbFetch(){
     const r = await lbRead('?select=name,aura,grade&order=aura.desc&limit=' + LB.top);
     if (!r.ok) throw new Error('HTTP ' + r.status);
     LB.rows = lbSane(await r.json()); LB.err = null;
-    repaintHallLB();                       // the board on the hall wall follows the real one
+    // the standing record, captured before this run joins the board
+    if (!G.recordSet){
+      G.recordSet = true;
+      G.record = Math.max(GOLD_SEED[0].a, LB.rows.length ? LB.rows[0].aura : -1e9);
+    }
+    repaintHallLB(); repaintHallGold();    // the boards on the hall wall follow the real one
     return LB.rows;
   } catch(e){ LB.err = e.message || 'could not reach the leaderboard'; return null; }
 }
@@ -9288,8 +9421,8 @@ function tuiSpec(){
   if (!G.started) return [];
   if (G.det && !G.det.done){
     const D = G.det;
-    if (D.locked) return [];
-    return DET_QS[D.batch[D.i]].a.map(function(_,i){
+    if (D.locked || !D.queue.length) return [];
+    return DET_QS[D.queue[0]].a.map(function(_,i){
       return [String(i+1), 'det'+(i+1), 'big']; });
   }
   if (G.mode === 'finale') return [['COOK','KeyF','big']];
@@ -9393,7 +9526,7 @@ if (__DEV) window.__BBB = { G, camera, buses, agents, scene, renderer, Audio_,
   lbSign, sha256hex, lbSane, lbDevice, lbBest, lbSetBest, lbRead,
   noView(){ return _lbNoView; },
   TOUCH, tuiSpec, updateTouchUI, tuiPress,
-  sendToDetention, startDetention, detAnswer, DET_QS, goToBay,
+  sendToDetention, startDetention, detAnswer, DET_QS, DET_TARGET, goToBay,
   lunchDetentionStart,
   detShow,
   ExamScene, EXAM_Y,
@@ -9402,6 +9535,8 @@ if (__DEV) window.__BBB = { G, camera, buses, agents, scene, renderer, Audio_,
   lunchKiosk, tuiHitKiosk, LUN, Lunch,
   boardTexture, BOARD_DEVELOPERS, BOARD_PREFECTS, BOARD_SUPPORTERS, Hall,
   paintHallLB, repaintHallLB, hallLBTexture,
+  paintHallGold, repaintHallGold, goldRoll, goldRecord, GOLD_SEED, finScript,
+  outstandingRoll, OUTSTANDING_MIN,
   get playerName(){ return PLAYER_NAME; }, setPlayerName(n){ PLAYER_NAME = n; },
   showResult(){ showResult(); },
   get player(){ return player; },
