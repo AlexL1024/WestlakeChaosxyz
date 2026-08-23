@@ -294,7 +294,9 @@
   .lbMsg { min-height:17px; margin-top:7px; font-size:12.5px; font-weight:700; letter-spacing:.4px; color:#a9c6b6; }
   .lbMsg.bad { color:#ff6a5a; }
   .lbMsg.good { color:#3ddc84; }
-  #lbList { margin:14px 0 16px; max-height:46vh; overflow:auto; border-radius:12px;
+  .lbCount { margin-top:12px; font-size:10.5px; font-weight:800; letter-spacing:2.4px;
+    text-transform:uppercase; color:#7f9c8b; }
+  #lbList { margin:8px 0 16px; max-height:52vh; overflow:auto; border-radius:12px;
     background:rgba(0,0,0,.28); padding:6px 4px; }
   .lbRow { display:flex; align-items:center; gap:10px; padding:6px 10px; font-size:14px; border-radius:8px; }
   .lbRow u { flex:0 0 30px; text-align:right; font-style:normal; text-decoration:none;
@@ -617,6 +619,7 @@
       </div>
       <div id="lbMsg" class="lbMsg"></div>
     </div>
+    <div id="lbCount" class="lbCount"></div>
     <div id="lbList"></div>
     <button id="lbBack">BACK</button>
   </div>
@@ -8777,7 +8780,7 @@ const LB = {
   url : 'https://vnycdreguqczsgpaamin.supabase.co',
   key : 'sb_publishable_TcQ1mgz8_Shq5gi3VEKarA_FJh7F0ga',
   table : 'scores',
-  top : 25,
+  top : 2000,        // the whole school, not a top-25 slice
   busy : false, sent : false, rows : null, err : null
 };
 function lbOn(){ return !!(LB.url && LB.key); }
@@ -8953,6 +8956,9 @@ function lbRender(mine){
   const rows = LB.rows;
   if (!rows){ box.innerHTML = '<div class="lbNote">Loading…</div>'; return; }
   if (!rows.length){ box.innerHTML = '<div class="lbNote">Nobody on the board yet. Be first.</div>'; return; }
+  const cnt = $('lbCount');
+  if (cnt) cnt.textContent = rows.length === 1 ? '1 run on the board'
+                                               : rows.length + ' runs on the board';
   let done = false;
   box.innerHTML = rows.map((r,i)=>{
     const me = (!done && mine && r.name === mine.name && r.aura === mine.aura) ? (done = true, ' me') : '';
@@ -8963,6 +8969,9 @@ function lbRender(mine){
       + '<em>' + (r.grade||'') + '</em>'
       + '<b>' + r.aura + '</b></div>';
   }).join('');
+  // with the whole school on there, put you where you can see yourself
+  const meRow = box.querySelector('.lbRow.me');
+  if (meRow) meRow.scrollIntoView({ block:'center' });
 }
 async function lbOpen(mine){
   $('lbOver').classList.remove('hidden');
