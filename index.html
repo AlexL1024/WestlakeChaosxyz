@@ -2444,7 +2444,7 @@ function honoursName(){
    right-hand wall as the school looks at the stage, actually say
    something, and those are set in big white letters you can read
    from your seat.                                                     */
-const BOARD_CREDITS = { title:'CREDITS',
+const BOARD_DEVELOPERS = { title:'DEVELOPERS',
   rows:[ {n:'ALEX LIANG'}, {n:'CLAUDE'} ],
   note:'LOL they made it in three afternoons.' };
 const BOARD_PREFECTS = { title:'SENIOR PREFECTS', rows:[
@@ -2466,29 +2466,86 @@ function fitFont(g, txt, maxW, px, weight, fam){
   }
   return 9;
 }
-function boardTexture(spec){
-  const W = 512, H = 1760;
-  const c = document.createElement('canvas'); c.width = W; c.height = H;
-  const g = c.getContext('2d');
+const BOARD_W = 512, BOARD_H = 1760;
+function boardBase(g, seed){
+  const W = BOARD_W, H = BOARD_H;
   // the timber
   g.fillStyle = '#a8763d'; g.fillRect(0, 0, W, H);
+  let r = (seed || 1) * 9301;
+  const rnd = function(){ r = (r*9301 + 49297) % 233280; return r/233280; };
   for (let i = 0; i < 240; i++){
-    g.globalAlpha = 0.05 + Math.random()*0.10;
-    g.fillStyle = Math.random() < 0.5 ? '#8d5f2c' : '#c08e52';
-    g.fillRect(Math.random()*W, 0, 1 + Math.random()*5, H);
+    g.globalAlpha = 0.05 + rnd()*0.10;
+    g.fillStyle = rnd() < 0.5 ? '#8d5f2c' : '#c08e52';
+    g.fillRect(rnd()*W, 0, 1 + rnd()*5, H);
   }
   g.globalAlpha = 1;
   g.fillStyle = '#6f4a20';
   g.fillRect(0, 0, W, 11); g.fillRect(0, H-11, W, 11);
   g.fillRect(0, 0, 10, H); g.fillRect(W-10, 0, 10, H);
   drawCrest(g, W/2, 168, 200);
+}
+function boardHead(g, title){
+  const W = BOARD_W, M = 40, IN = W - M*2;
+  const tPx = fitFont(g, title, IN - 40, 40, '800', 'Georgia, "Times New Roman", serif');
+  spacedCaps(g, title, W/2, 350, tPx, 2.6, '#ffffff', '800');
+  g.strokeStyle = '#f0e4c8'; g.lineWidth = 3;
+  g.beginPath(); g.moveTo(M+18, 378); g.lineTo(W-M-18, 378); g.stroke();
+}
+
+/* ---- the live board: the top ten off the leaderboard ---- */
+let hallLB = null;
+function paintHallLB(g){
+  const W = BOARD_W;
+  boardBase(g, 7);
+  boardHead(g, 'TOP AURA');
+  const rows = (typeof LB !== 'undefined' && LB.rows) ? LB.rows.slice(0, 10) : null;
+  g.textAlign = 'center';
+  if (!rows || !rows.length){
+    g.fillStyle = '#e9d6ac'; g.font = 'italic 600 30px Georgia, serif';
+    g.fillText(rows ? 'Nobody on the board yet.' : 'westlakeboys.xyz', W/2, 700);
+    g.fillText(rows ? 'Be the first.' : 'Play to put a name up here.', W/2, 746);
+    g.textAlign = 'left';
+    return;
+  }
+  for (let i = 0; i < rows.length; i++){
+    const y = 470 + i*120;
+    const nm = String(rows[i].name || '').slice(0, 14);
+    g.textAlign = 'left';
+    g.font = '800 30px Georgia, serif';
+    g.fillStyle = i===0 ? '#ffd23f' : i===1 ? '#e4e9ea' : i===2 ? '#d09257' : '#c9b489';
+    g.fillText(String(i+1), 44, y);
+    g.fillStyle = '#ffffff';
+    const np = fitFont(g, nm, 290, 34, '800', 'Georgia, serif');
+    g.font = '800 ' + np + 'px Georgia, serif';
+    g.fillText(nm, 100, y);
+    g.textAlign = 'right';
+    g.font = '800 30px Georgia, serif'; g.fillStyle = '#e9d6ac';
+    g.fillText(String(rows[i].aura), W-44, y);
+  }
+  g.textAlign = 'left';
+}
+function hallLBTexture(){
+  const c = document.createElement('canvas'); c.width = BOARD_W; c.height = BOARD_H;
+  paintHallLB(c.getContext('2d'));
+  hallLB = { canvas: c, tex: new THREE.CanvasTexture(c) };
+  return hallLB.tex;
+}
+function repaintHallLB(){
+  if (!hallLB) return;
+  paintHallLB(hallLB.canvas.getContext('2d'));
+  hallLB.tex.needsUpdate = true;
+}
+
+function boardTexture(spec){
+  const W = BOARD_W, H = BOARD_H;
+  if (spec === 'leaderboard') return hallLBTexture();
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  boardBase(g, 1 + Math.floor(Math.random()*40));
   if (!spec) return new THREE.CanvasTexture(c);     // a bare board
 
   const M = 40, IN = W - M*2;
-  const tPx = fitFont(g, spec.title, IN - 40, 40, '800', 'Georgia, "Times New Roman", serif');
-  spacedCaps(g, spec.title, W/2, 350, tPx, 2.6, '#ffffff', '800');
-  g.strokeStyle = '#f0e4c8'; g.lineWidth = 3;
-  g.beginPath(); g.moveTo(M+18, 378); g.lineTo(W-M-18, 378); g.stroke();
+  boardHead(g, spec.title);
 
   const withRoles = spec.rows.some(r => r.r);
   const bottom = spec.note ? 1520 : 1660;
@@ -2857,7 +2914,7 @@ const HEAD_OPENERS = [
 ];
 // this one is read out every assembly, whatever else he finds to complain about
 const HEAD_SUPPORTERS_LINE =
-  'Look to the boards on your right \u2014 our supporters. Repost alexlbuilds\u2019 post to get on the wall!';
+  'Look to the board on your left \u2014 our supporters. Repost alexlbuilds\u2019 post to get on the wall!';
 const HEAD_ACHIEVEMENTS = [
   { solo:false, text:'won the North Harbour football champs' },
   { solo:true,  text:'won the North Island championship for saying \u201csix seven\u201d the most times in sixty seconds. He did it sixty-seven times' },
@@ -2990,8 +3047,8 @@ const Hall = (function(){
     // side 1 is +X: the right-hand wall as the school looks at the stage,
     // and index 0 is the board nearest the stage
     const boards = [
-      [ null, null, null, null, null ],
-      [ BOARD_CREDITS, BOARD_PREFECTS, BOARD_SUPPORTERS, null, null ]
+      [ BOARD_SUPPORTERS, null, null, null, null ],
+      [ 'leaderboard', BOARD_DEVELOPERS, BOARD_PREFECTS, null, null ]
     ];
     for (let side=0; side<2; side++){
       const sx = side ? 1 : -1;
@@ -8505,6 +8562,7 @@ function loop(now){
    14.  BOOT
    ============================================================ */
 function startAssembly(){
+  if (lbOn()) lbFetch();                   // so the wall board has today's top ten on it
   sun.intensity = 0.34; hemi.intensity = 0.34;
   G.mode='assembly'; G.started=true; G.phase='idle'; G.auraBank=0;
   hideControlCue(); clearInputEdges();
@@ -8799,6 +8857,7 @@ async function lbFetch(){
         + '?select=name,aura,grade&order=aura.desc&limit=' + LB.top, { headers: lbHead() });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     LB.rows = await r.json(); LB.err = null;
+    repaintHallLB();                       // the board on the hall wall follows the real one
     return LB.rows;
   } catch(e){ LB.err = e.message || 'could not reach the leaderboard'; return null; }
 }
@@ -9198,7 +9257,8 @@ window.__BBB = { G, camera, buses, agents, scene, renderer, Audio_,
   AURA_LOG,
   FIN_GOOD, FIN_BAD,
   lunchKiosk, tuiHitKiosk, LUN, Lunch,
-  boardTexture, BOARD_CREDITS, BOARD_PREFECTS, BOARD_SUPPORTERS, Hall,
+  boardTexture, BOARD_DEVELOPERS, BOARD_PREFECTS, BOARD_SUPPORTERS, Hall,
+  paintHallLB, repaintHallLB, hallLBTexture,
   get playerName(){ return PLAYER_NAME; }, setPlayerName(n){ PLAYER_NAME = n; },
   showResult(){ showResult(); },
   get player(){ return player; },
