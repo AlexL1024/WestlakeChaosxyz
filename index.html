@@ -2493,7 +2493,13 @@ function goldRecord(){
 
 const BOARD_SUPPORTERS = { title:'SUPPORTERS',
   rows:[ {n:'BEVIS JIANG'}, {n:'MIN-SEO BANG'}, {n:'MIGUEL CHAN'},
-         {n:'EVAN LI'}, {n:'ROID KIM'} ] };
+         {n:'EVAN LI'}, {n:'ROID KIM'}, {n:'RYAN LEONG'} ] };
+
+/* A board of its own, at the far end of the left wall.  Kept for the ones who
+   did more than repost — short on purpose, so a name on it means something. */
+const BOARD_SPECIAL = { title:'SPECIAL\nSUPPORTERS',
+  rows:[ {n:'TRISTAN MONA'} ],
+  note:'Went above and beyond for westlakeboys.xyz.' };
 
 function fitFont(g, txt, maxW, px, weight, fam){
   for (let sz = px; sz > 8; sz -= 1){
@@ -2522,8 +2528,17 @@ function boardBase(g, seed){
 }
 function boardHead(g, title){
   const W = BOARD_W, M = 40, IN = W - M*2;
-  const tPx = fitFont(g, title, IN - 40, 40, '800', 'Georgia, "Times New Roman", serif');
-  spacedCaps(g, title, W/2, 350, tPx, 2.6, '#ffffff', '800');
+  // A '\n' in the title stacks it, so a long one stays big instead of shrinking
+  const lines = String(title).split('\n');
+  // spacedCaps adds `track` px between letters, so leave room for it
+  let tPx = 40;
+  for (const ln of lines)
+    tPx = Math.min(tPx, fitFont(g, ln, IN - 40 - 2.6*ln.length, 40,
+                                '800', 'Georgia, "Times New Roman", serif'));
+  const lh = tPx + 8, base = 350 - (lines.length-1)*lh;
+  lines.forEach(function(ln, i){
+    spacedCaps(g, ln, W/2, base + i*lh, tPx, 2.6, '#ffffff', '800');
+  });
   g.strokeStyle = '#f0e4c8'; g.lineWidth = 3;
   g.beginPath(); g.moveTo(M+18, 378); g.lineTo(W-M-18, 378); g.stroke();
 }
@@ -3158,7 +3173,7 @@ const Hall = (function(){
     // side 1 is +X: the right-hand wall as the school looks at the stage,
     // and index 0 is the board nearest the stage
     const boards = [
-      [ BOARD_SUPPORTERS, null, null, null, null ],
+      [ BOARD_SPECIAL, BOARD_SUPPORTERS, null, null, null ],
       [ 'leaderboard', BOARD_DEVELOPERS, BOARD_PREFECTS, 'gold', null ]
     ];
     for (let side=0; side<2; side++){
@@ -9590,7 +9605,7 @@ if (__DEV) window.__BBB = { G, camera, buses, agents, scene, renderer, Audio_,
   AURA_LOG,
   FIN_GOOD, FIN_BAD,
   lunchKiosk, tuiHitKiosk, LUN, Lunch,
-  boardTexture, BOARD_DEVELOPERS, BOARD_PREFECTS, BOARD_SUPPORTERS, Hall,
+  boardTexture, BOARD_DEVELOPERS, BOARD_PREFECTS, BOARD_SUPPORTERS, BOARD_SPECIAL, Hall,
   paintHallLB, repaintHallLB, hallLBTexture,
   paintHallGold, repaintHallGold, goldRoll, goldRecord, GOLD_SEED, finScript,
   outstandingRoll, OUTSTANDING_MIN,
