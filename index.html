@@ -8926,11 +8926,11 @@ function lbHead(){ return { apikey: LB.key, Authorization: 'Bearer ' + LB.key,
    folded back to letters, everything else deleted, so "$h1t", "f u c k" and
    "fuuuck" all land on the same string.                                        */
 const LB_NOTCOOL = 'Not a cool name. Try another one.';
-const LB_LEET = {'0':'o','1':'i','3':'e','4':'a','5':'s','7':'t','8':'b','9':'g',
+const LB_LEET = {'0':'o','1':'i','3':'e','4':'a','5':'s','6':'g','7':'t','8':'b','9':'g',
                  '@':'a','$':'s','!':'i','|':'i','+':'t','(':'c'};
 function lbFlat(str){
   return String(str||'').toLowerCase()
-    .replace(/[013457890@$!|+(]/g, c => LB_LEET[c] || '')
+    .replace(/[0134567890@$!|+(]/g, c => LB_LEET[c] || '')
     .replace(/[^a-z]/g, '');
 }
 const LB_SQ = t => t.replace(/(.)\1+/g, '$1');          // fuuuck -> fuck
@@ -8940,7 +8940,37 @@ const LB_HARD = ('fuck fuk fck phuck fuc shit shyt cunt nigg nigr negro chink go
   + 'chingchong chongching chinky slanteye currymuncher towelhead '
   + 'wank twat bollock jizz cumshot blowjob dildo boner scrotum masturb suicide selfharm '
   + 'bitch btch slut bastard retard prick pussy pusy kys kms '
+  + 'adolf fuhrer fuehrer reich holocaust gaschamber heilhitler swastika '
+  + 'foreskin ballsack nutsack smegma queef kiddyfiddler groomer beaner redskin injun '
+  + 'mongoloid gyppo halfcaste jigaboo sandnig zog heeb '
   + 'fordham headmaster deputy principal westlakeboys moderator').split(' ');
+
+/* ---- innocent words that contain a blocked pattern ----
+   These are cut out of the flattened name before the patterns below run, so
+   Knight and Cuckoo get through while neiguh and bigcuck do not. */
+const LB_SAFE = ('knight night nigel nigella nigeria nigerian cuckoo jewel jewels jewellery '
+  + 'crackerjack nutcracker').split(' ');
+
+/* ---- pattern families ----
+   A word list only ever catches the spelling you thought of.  These match the
+   shape of the word instead, so deliberate misspellings land in the same net. */
+const LB_RX = [
+  /n[ie]{1,3}[gq]{1,4}[aeiouhr]{0,4}/,       // the n-word, however it is spelled
+  /n[ie]{1,3}[gq]n[oa][gq]/,                 //   ...and the -nog form
+  /reggin|regin/,                            //   ...and backwards
+  /[ck]{1,2}u{1,3}[ck]{1,3}(?!oo)/,          // cuck, kuck, cucck  (cuckoo is cut above)
+  /f[ou]{1,3}h?rer/,                         // fuhrer / fuehrer
+  /hitl[ae]r|adolf|nazi|heil ?hitler/,
+  /cra[ck]{1,3}[aeh]r?(?![a-z])/,            // cracker / cracka / cracke
+  /f[o0]resk[iy]n/,
+  /n[eé]gr[oi]/,
+  /ch[iy]nk|g[o0]{2}k|sl[ae]nte?ye?/,
+  /f[a4]g{1,3}([oi]t)?(?![a-z])/,            // fag / faggot, not "flag"
+  /r[ae]p(e|ist|ing)(?![a-z])/               // rape, not "grape" (whole-ish)
+];
+
+/* ---- words the school adds itself, kept in one place ---- */
+const LB_EXTRA = ('jew jews jewboy cracker cracka cracke tomboy').split(' ');
 
 const LB_SOFT = ('ass arse asses anal anus cum cock kock dick dik hoe sex sexy tit tits titty '
   + 'boob boobs bum poo poop pee wee fart turd balls crap piss gay homo spaz spic coon abo '
@@ -8950,9 +8980,26 @@ const LB_SOFT = ('ass arse asses anal anus cum cock kock dick dik hoe sex sexy t
 
 function lbNasty(raw){
   const flat = lbFlat(raw), sq = LB_SQ(flat);
+  // NlGGA — a lowercase L standing in for an I is the oldest trick there is
+  const forms = [flat, sq, flat.replace(/l/g, 'i'), sq.replace(/l/g, 'i')];
+  // take the innocent words out of the way first
+  const scrubbed = forms.map(function(f){
+    for (const w of LB_SAFE){
+      // every shape the safe word could be in by the time we get here
+      for (const v of [w, LB_SQ(w), w.replace(/l/g,'i'), LB_SQ(w).replace(/l/g,'i')])
+        f = f.split(v).join('');
+    }
+    return f;
+  });
+  for (const rx of LB_RX) for (const f of scrubbed) if (rx.test(f)) return true;
   for (const w of LB_HARD) if (flat.indexOf(w) >= 0 || sq.indexOf(w) >= 0) return true;
   // "G o o n" spells one word, not four
   for (const w of LB_SOFT) if (flat === w || sq === w) return true;
+  for (const w of LB_EXTRA){
+    if (scrubbed.indexOf(w) >= 0) return true;                     // the whole name
+    for (const t of String(raw||'').split(/[^0-9A-Za-z]+/))        // or one word of it
+      if (lbFlat(t) === w) return true;
+  }
   // whole words only, so Grass, Cocktail and analysis all get through
   for (const t of String(raw||'').split(/[^0-9A-Za-z@$!|+(]+/)){
     const f = lbFlat(t); if (!f) continue;
@@ -9182,15 +9229,25 @@ const LB_AURA_MIN = -400, LB_AURA_MAX = 500;
    from the score rather than read off the row, the name is put back through the
    same filter the entry box uses, and anything scoring outside what a real run
    can reach is dropped on the floor. */
+/* A name already on the board may have been censored to "ne****".  The entry box
+   still refuses asterisks, but the display has to keep them — otherwise the stars
+   get stripped and the start of the word is all that shows. */
+function lbShowName(raw){
+  let n = String(raw == null ? '' : raw).replace(/\s+/g,' ').trim().slice(0,14);
+  n = n.replace(/[^\w *\-'.]/g,'').replace(/\s+/g,' ').trim();
+  if (!n) return null;
+  if (lbNasty(n)) return null;          // the stars must have hidden enough of it
+  return n;
+}
 function lbSane(rows){
   if (!rows) return rows;
   const out = [];
   for (const r of rows){
     const a = Math.round(Number(r.aura));
     if (!isFinite(a) || a < LB_AURA_MIN || a > LB_AURA_MAX) continue;
-    const c = lbClean(String(r.name == null ? '' : r.name));
-    if (!c.ok) continue;
-    out.push({ name: c.name, aura: a, grade: auraGrade(a).name });
+    const nm = lbShowName(r.name);
+    if (!nm) continue;
+    out.push({ name: nm, aura: a, grade: auraGrade(a).name });
   }
   out.sort(function(x,y){ return y.aura - x.aura; });
   return out;
@@ -9523,7 +9580,7 @@ const __DEV = /[?&]dev=1/.test(location.search || '');
 if (__DEV) window.__BBB = { G, camera, buses, agents, scene, renderer, Audio_,
   LB, lbOn, lbClean, lbFetch, lbSubmit, lbOpen, lbClose, lbSend, lbRender, lbMine(){ return lbMine(); },
   lbCount, lbPlacing, lbFinish,
-  lbSign, sha256hex, lbSane, lbDevice, lbBest, lbSetBest, lbRead,
+  lbSign, sha256hex, lbSane, lbShowName, lbDevice, lbBest, lbSetBest, lbRead,
   noView(){ return _lbNoView; },
   TOUCH, tuiSpec, updateTouchUI, tuiPress,
   sendToDetention, startDetention, detAnswer, DET_QS, DET_TARGET, goToBay,
