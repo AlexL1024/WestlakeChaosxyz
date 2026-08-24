@@ -1101,22 +1101,34 @@ function buildTeacher(){
    ============================================================ */
 const NAVY=0x1e2c4c, NAVY_D=0x172239, SILVER=0xb4bac1, SILVER_D=0x8e959d, GLASS_F=0x0f1420;
 
+/* The school buses' blind.  Same equipment as the 871's — it is the same fleet — so
+   the same amber dots on the same black, laid out the same way: wording on the left,
+   route number in its own column on the right.  Only the wording differs: "School Bus"
+   where a public service carries a destination.  Measured with fitFont because Segoe
+   is not there on most machines and the fallback runs wide. */
 function ledTexture(num, dest){
-  const c=document.createElement('canvas'); c.width=512; c.height=128;
+  const c=document.createElement('canvas'); c.width=768; c.height=176;
   const g=c.getContext('2d');
-  g.fillStyle='#05060a'; g.fillRect(0,0,512,128);
-  g.fillStyle='#ffd27a'; g.textAlign='left';
+  const F='"Segoe UI",Arial,sans-serif';
+  g.fillStyle='#05060a'; g.fillRect(0,0,768,176);
+  g.textBaseline='alphabetic';
+  const COL = 528;                                   // where the route number's column starts
+  g.fillStyle='#ffb42e'; g.textAlign='left';
   if (dest){
-    g.font='bold 44px "Segoe UI",sans-serif'; g.fillText('School Bus', 14, 52);
-    g.font='bold 34px "Segoe UI",sans-serif'; g.fillText(dest, 14, 100);
+    g.font='bold '+fitFont(g,'School Bus',COL-42,88,'bold',F)+'px '+F;
+    g.fillText('School Bus', 20, 94);
+    g.font='bold '+fitFont(g,dest,COL-42,46,'bold',F)+'px '+F;
+    g.fillText(dest, 20, 150);
   } else {
-    g.font='bold 52px "Segoe UI",sans-serif'; g.fillText('School Bus', 14, 82);
+    g.font='bold '+fitFont(g,'School Bus',COL-42,106,'bold',F)+'px '+F;
+    g.fillText('School Bus', 20, 128);
   }
-  g.textAlign='right'; g.font='bold 82px "Segoe UI",sans-serif'; g.fillText(num||'04', 500, 86);
-  // dot-matrix mask
+  g.textAlign='right';
+  g.font='bold '+fitFont(g,num||'04',768-COL-26,110,'bold',F)+'px '+F;
+  g.fillText(num||'04', 748, 130);
   g.globalCompositeOperation='destination-out'; g.fillStyle='#000';
-  for (let y=0;y<128;y+=4) g.fillRect(0,y+2,512,2);
-  for (let x=0;x<512;x+=4) g.fillRect(x+2,0,2,128);
+  for (let y=0;y<176;y+=4) g.fillRect(0,y+3,768,1);
+  for (let x=0;x<768;x+=4) g.fillRect(x+3,0,1,176);
   g.globalCompositeOperation='source-over';
   return new THREE.CanvasTexture(c);
 }
@@ -1220,89 +1232,181 @@ const TEX_FLEET_SD = fleetTexture('GB5417');   // the single-decker's fleet numb
 const glassMat = new THREE.MeshLambertMaterial({color:0x11161f, transparent:true, opacity:0.46, side:THREE.DoubleSide, depthWrite:false});
 const windshieldMat = new THREE.MeshLambertMaterial({color:0x1a2130, transparent:true, opacity:0.42, side:THREE.DoubleSide, depthWrite:false});
 
+/* ---- the school buses' bodywork ------------------------------------------------
+   These are AT's own low-floor single-deckers with a school blind in the box, not a
+   separate yellow fleet, so they wear the same scheme as the 871: silver skirt, navy
+   waist, one unbroken black glazing ribbon, pale roof dome.  What sets them apart is
+   the blind, the yellow SCHOOL board and the Enviro's round triple lamp clusters
+   where the Geely carries its swept wedge.
+   The glass is a shade lighter than the 871's on purpose — you have to be able to see
+   the crush through it, and the crush is the game. */
+const SB_NAVY = 0x1f2a47, SB_SIL = 0xb6bcc4, SB_SIL_D = 0x8d939b,
+      SB_COVE = 0xd5dae1, SB_BLK = 0x090b11, SB_YEL = 0xe6b81c;
+const SBG = {
+  HL: BUS_HL, HW: BUS_HW,
+  BODY_B: 0.42,                 // bottom of the painted body; black valance below it
+  SPLIT:  1.16,                 // silver gives way to navy, just clear of the arches
+  WIN0:   1.86, WIN1: 2.96,     // the glazing ribbon
+  COVE:   3.23, ROOF: 3.30      // the pale dome edge is a sliver, not a stripe
+};
+/* front elevation, bottom up: black valance, silver bumper, navy panel, screen, cove */
+const SBF = { V0:0.16, B0:0.55, B1:1.16, P1:1.78, S1:3.12, BLIND_Y:2.79, BLIND_H:0.46 };
+const SB_PIL  = [-6.20,-4.66,-3.12,-1.58,-0.04,0.78,2.22,3.62,4.96,6.20];
+const SB_AXLE = [4.35, -2.92, -4.30];
+
+/* Three round lamps a side, climbing outboard round the corner — the cluster follows
+   the body line up into the nose, so the amber indicator ends up highest and nearest
+   the corner and the main beams sit low and inboard.  That is the Enviro's arrangement
+   and it is nothing like the 871's.  Drawn rather than modelled for the same reason the
+   871's are: one unlit decal covers both sides, and a lit ring reads as emitting
+   instead of as navy paint catching the afternoon. */
+function sbLampTexture(){
+  const W=1024, H=256;
+  const c=document.createElement('canvas'); c.width=W; c.height=H;
+  const g=c.getContext('2d');
+  g.clearRect(0,0,W,H);
+  const ARC = [[60,96,36,'#ffb04a'],[116,144,44,'#eef4ff'],[172,190,50,'#f8fbff']];
+  function cluster(x0, mirror){
+    g.save(); g.translate(x0,0);
+    if (mirror){ g.translate(246,0); g.scale(-1,1); }
+    for (const a of ARC){
+      const x=a[0], y=a[1], r=a[2], col=a[3];
+      g.beginPath(); g.arc(x,y,r+9,0,6.2832); g.fillStyle='#05070c'; g.fill();   // the pocket
+      const gr=g.createRadialGradient(x,y-r*0.35,0, x,y,r);
+      gr.addColorStop(0,col); gr.addColorStop(0.42,'rgba(196,216,246,0.62)');
+      gr.addColorStop(1,'rgba(58,84,126,0.30)');
+      g.beginPath(); g.arc(x,y,r,0,6.2832); g.fillStyle=gr; g.fill();
+      g.shadowColor='rgba(200,222,255,0.95)'; g.shadowBlur=14;
+      g.strokeStyle=col; g.lineWidth=8;
+      g.beginPath(); g.arc(x,y,r-4,0,6.2832); g.stroke();                        // the lit ring
+      g.shadowBlur=0;
+    }
+    g.restore();
+  }
+  cluster(6,false); cluster(W-252,true);
+  const t=new THREE.CanvasTexture(c); t.anisotropy=8; return t;
+}
+const TEX_SB_LAMPS = sbLampTexture();
+const sbGlassMat  = new THREE.MeshLambertMaterial({color:0x0b0f18, transparent:true, opacity:0.62,
+                                                   side:THREE.DoubleSide, depthWrite:false});
+const sbScreenMat = new THREE.MeshLambertMaterial({color:0x18202e, transparent:true, opacity:0.36,
+                                                   side:THREE.DoubleSide, depthWrite:false});
+
 function buildBusExterior(){
   const b=new Builder();
-  const L=12.4, HW=BUS_HW, W=HW*2;
-  // ---- roof + rear + front shells ----
-  b.box(L, 0.14, W, NAVY, 0, 3.36, 0);
-  b.box(L*0.86, 0.10, W*0.78, 0x2a3a5e, -0.6, 3.44, 0);   // roof hatch strip
-  b.box(0.10, 2.05, W, NAVY, -BUS_HL, 2.32, 0);           // rear upper
-  b.box(0.10, 0.88, W, SILVER, -BUS_HL, 0.86, 0);         // rear lower
-  b.box(0.12, 0.9, 1.9, NAVY_D, -BUS_HL-0.01, 2.35, 0);  // rear window frame
-  b.box(0.10, 0.24, 0.4, 0x8b1f24, -BUS_HL-0.03, 1.45,  0.85);
-  b.box(0.10, 0.24, 0.4, 0x8b1f24, -BUS_HL-0.03, 1.45, -0.85);
-  // ---- front ----
-  const FX = BUS_HL, BLK = 0x0b0d10;
-  // the whole top of the front is one black glass band with the sign inside it
-  b.box(0.13, 0.78, W,      BLK,    FX+0.005, 2.90, 0);
-  b.box(0.15, 0.05, W*1.01, 0x191d25, FX+0.02, 2.71, 0);        // seam under the sign
-  b.box(0.16, 0.10, W,      NAVY_D, FX+0.01, 3.31, 0);          // navy lip at the roof
-  // the windscreen: a deep raked recess with dark pillars either side
-  b.box(0.19, 0.98, 0.16,   0x14181f, FX+0.01, 2.28,  HW-0.07); // A-pillars
-  b.box(0.19, 0.98, 0.16,   0x14181f, FX+0.01, 2.28, -HW+0.07);
-  b.box(0.20, 0.09, W,      0x14181f, FX+0.02, 1.80, 0);        // sill under the glass
-  // navy between the screen and the silver
-  b.box(0.13, 0.62, W, NAVY,   FX, 1.44, 0);
-  // silver lower front, and the bumper
-  b.box(0.17, 0.86, W, SILVER, FX+0.02, 0.78, 0);
-  b.box(0.21, 0.32, W*1.01, SILVER_D, FX+0.05, 0.40, 0);
-  b.box(0.10, 0.05, W*1.01, 0x6f767e, FX+0.10, 0.56, 0);
-  // round lamp clusters, three a side, outer one amber
+  const {HL,HW,BODY_B,SPLIT,WIN0,WIN1,COVE,ROOF} = SBG;
+  const F=SBF, MW=HW*2, FX=HL, BLK=SB_BLK, IN=0.24;
+
+  // ---- roof: the dome is pale on these, not navy, and it is half of why the
+  //      glazing below it reads as one dark ribbon ----
+  b.box(HL*2, 0.08, MW, SB_COVE, 0, ROOF+0.04, 0);
+  b.box(HL*1.10, 0.10, MW*0.52, 0x7f8792, -1.30, ROOF+0.11, 0);   // hatches and trunking
+  b.box(1.50, 0.12, MW*0.40, 0x767e89, 3.85, ROOF+0.12, 0);       // the pack over the cab
+  // the roof rolls over into the screen rather than meeting it at a corner
+  b.box(0.40, 0.11, MW-0.16, SB_COVE, FX-0.16, ROOF-0.02, 0, 0,0,-0.42);
+
+  // ---- rear ----
+  b.box(0.12, ROOF-COVE,    MW, SB_COVE,   -HL,       (COVE+ROOF)/2, 0);
+  b.box(0.12, COVE-WIN1,    MW, SB_NAVY,   -HL,       (WIN1+COVE)/2, 0);
+  b.box(0.12, WIN1-WIN0,    MW, BLK,       -HL-0.02,  (WIN0+WIN1)/2, 0);
+  b.box(0.12, WIN0-SPLIT,   MW, SB_NAVY,   -HL,       (SPLIT+WIN0)/2, 0);
+  b.box(0.13, 0.05,         MW, 0xd4d9df,  -HL-0.005, SPLIT, 0);          // the split pinstripe
+  b.box(0.12, SPLIT-BODY_B, MW, SB_SIL,    -HL,       (BODY_B+SPLIT)/2, 0);
+  b.box(0.13, BODY_B-F.V0,  MW, 0x171a20,  -HL,       (F.V0+BODY_B)/2, 0);  // black valance
   for (const sz of [1,-1]){
-    for (let i=0;i<3;i++){
-      const zz = sz*(0.66 + i*0.235);
-      b.cyl(0.115,0.115,0.09,12, 0x2a2e35, FX+0.09, 0.62, zz, 0,0,Math.PI/2);
-      b.cyl(0.088,0.088,0.10,12, i===2? 0xffb35c : 0xf7f2df, FX+0.115, 0.62, zz, 0,0,Math.PI/2);
-    }
+    b.box(0.10, 0.38, 0.26, 0x8b1f24, -HL-0.05, 1.48, sz*0.88);
+    b.box(0.10, 0.12, 0.26, 0xd8a238, -HL-0.05, 1.24, sz*0.88);
   }
-  // wipers parked across the bottom of the screen
-  b.box(0.05,0.035,1.15, 0x15171b, FX+0.10, 1.86,  0.42, 0,0,0);
-  b.box(0.05,0.035,1.15, 0x15171b, FX+0.10, 1.86, -0.42, 0,0,0);
-  // mirrors
-  b.cyl(0.03,0.03,0.75,6, 0x1b1e24, BUS_HL-0.35, 2.85, -HW-0.18, 0,0,0.25);
-  b.box(0.08,0.42,0.24, 0x1b1e24, BUS_HL-0.52, 2.52, -HW-0.34);
-  b.cyl(0.03,0.03,0.75,6, 0x1b1e24, BUS_HL-0.35, 2.85,  HW+0.18, 0,0,-0.25);
-  b.box(0.08,0.42,0.24, 0x1b1e24, BUS_HL-0.52, 2.52,  HW+0.34);
+
+  // ---- front ----
+  b.box(0.24, BODY_B-F.V0, MW-2*IN+0.10, 0x171a20, FX+0.02, (F.V0+BODY_B)/2, 0);   // valance
+  b.box(0.22, F.B1-F.B0,   MW-2*IN+0.06, SB_SIL,   FX+0.03, (F.B0+F.B1)/2, 0);     // bumper
+  b.box(0.24, 0.05,        MW-2*IN+0.08, 0xd4d9df, FX+0.05, F.B1, 0);              // pinstripe, as on the flank
+  b.box(0.14, F.P1-F.B1,   MW-2*IN,      SB_NAVY,  FX+0.02, (F.B1+F.P1)/2, 0);     // badge/lamp panel
+  b.box(0.16, 0.14,        MW-2*IN+0.02, BLK,      FX+0.04, F.P1-0.07, 0);         // screen surround, bottom
+  b.box(0.16, (ROOF+0.02)-F.S1, MW,      SB_COVE,  FX+0.03, ((ROOF+0.02)+F.S1)/2, 0);  // pale cove
+  b.box(0.09, (ROOF+0.02)-F.S1, MW-0.10, 0x161c26, FX-0.06, ((ROOF+0.02)+F.S1)/2, 0);
+  // The screen stays an open aperture with a black surround: fill it and you lose the
+  // driver and the whole front of the saloon, which is half of why this bus reads at all.
+  for (const sz of [1,-1])
+    b.box(0.16, F.S1-F.P1, 0.26, BLK, FX+0.03, (F.P1+F.S1)/2, sz*(MW/2-IN-0.10));
+  b.box(0.17, 0.10, MW-2*IN, BLK, FX+0.04, F.S1-0.05, 0);
+  // The front is rounded, not boxy: a slanted panel tucks each corner back into the
+  // flank instead of letting the front face meet it at a right angle.
+  const CORN = [[F.V0,F.B0,0x171a20], [F.B0,F.B1,SB_SIL], [F.B1,F.P1,SB_NAVY],
+                [F.P1,F.S1,BLK],      [F.S1,ROOF+0.02,SB_COVE]];
+  for (const sz of [1,-1]) for (const c of CORN)
+    b.box(0.50, c[1]-c[0], 0.11, c[2], FX-0.20, (c[0]+c[1])/2, sz*(HW-0.14), 0, sz*0.70, 0);
+  // the blind box stands proud of the screen so the gaps between its dots stay black
+  b.box(0.07, F.BLIND_H+0.06, 2.28, 0x05060a, FX+0.10, F.BLIND_Y, 0);
+  // wipers parked low across the screen
+  for (const sz of [1,-1]){
+    b.box(0.05,0.05,1.04, 0x15171b, FX+0.12, 1.98, sz*0.54, 0.68);
+    b.box(0.06,0.16,0.07, 0x15171b, FX+0.12, 1.82, sz*0.54);
+  }
+  // mirrors: black heads out on stalks either side of the screen
+  for (const sz of [1,-1]){
+    b.cyl(0.035,0.035,0.62,6, 0x1b1e24, FX-0.24, 2.92, sz*(HW+0.20), 0,0,-sz*0.30);
+    b.box(0.09,0.54,0.24, 0x1b1e24, FX-0.40, 2.62, sz*(HW+0.36));
+    b.box(0.03,0.44,0.18, 0x3a4049, FX-0.46, 2.62, sz*(HW+0.36));
+  }
 
   // ---- flanks ----
   function flank(z, hasDoor){
-    const segs = hasDoor ? [[-BUS_HL, 0.78],[2.22, BUS_HL]] : [[-BUS_HL, BUS_HL]];
+    const segs = hasDoor ? [[-HL, 0.78],[2.22, HL]] : [[-HL, HL]];
     for (const s of segs){
       const w=s[1]-s[0], cx=(s[0]+s[1])/2;
-      b.box(w, 0.88, 0.09, SILVER, cx, 0.86, z);        // silver skirt
-      b.box(w, 0.10, 0.11, SILVER_D, cx, 0.44, z);
-      b.box(w, 0.50, 0.09, NAVY, cx, 1.55, z);          // navy under window
+      b.box(w, BODY_B-F.V0,  0.08, 0x171a20, cx, (F.V0+BODY_B)/2, z);
+      b.box(w, SPLIT-BODY_B, 0.09, SB_SIL,   cx, (BODY_B+SPLIT)/2, z);
+      b.box(w, 0.05,         0.11, 0xd4d9df, cx, SPLIT, z);
+      b.box(w, WIN0-SPLIT,   0.09, SB_NAVY,  cx, (SPLIT+WIN0)/2, z);
     }
-    b.box(hasDoor? BUS_HL*2 : BUS_HL*2, 0.66, 0.09, NAVY, 0, 3.03, z);  // navy above window
-    // window pillars
-    const pillars=[-6.20,-4.60,-3.00,-1.40,0.20,0.78,2.22,3.60,5.00,6.20];
-    for (const px of pillars) b.box(0.13, 0.98, 0.10, NAVY, px, 2.26, z);
+    b.box(HL*2, COVE-WIN1,  0.09, SB_NAVY, 0, (WIN1+COVE)/2, z);
+    b.box(HL*2, ROOF-COVE,  0.10, SB_COVE, 0, (COVE+ROOF)/2, z);
+    // Rubbers top and bottom plus black pillars: this is the whole trick, the flank has
+    // to read as one dark ribbon rather than a row of separate windows.
+    b.box(HL*2, 0.06, 0.11, BLK, 0, WIN0+0.03, z);
+    b.box(HL*2, 0.06, 0.11, BLK, 0, WIN1-0.03, z);
+    for (const px of SB_PIL) b.box(0.12, WIN1-WIN0, 0.10, BLK, px, (WIN0+WIN1)/2, z);
     if (hasDoor){
-      // the bulkhead across the back of the entrance well, with a grab pole
+      // The bulkhead across the back of the entrance well.  The boarding code stops
+      // people dead here, so it has to sit exactly where it always has.
       const bz = z + (DOOR_BACK - (BUS_Z - BUS_HW));       // door well depth, in bus-local Z
       b.box(1.44, 0.98, 0.10, 0x2b3038, 1.50, 0.98, bz);
       b.box(1.44, 0.08, 0.14, 0x3d434c, 1.50, 1.48, bz);
       b.cyl(0.045,0.045,2.00,8, 0xd8b12a, 1.50, 1.52, bz-0.10);
       b.box(0.42,0.34,0.16, 0x1f242c, 0.98, 1.30, bz-0.08);   // the ticket machine
       b.box(0.30,0.16,0.03, 0x2f7ac4, 0.98, 1.36, bz-0.17);
-      // door frame
-      b.box(0.10, 2.20, 0.14, NAVY_D, 0.78, 1.66, z);
-      b.box(0.10, 2.20, 0.14, NAVY_D, 2.22, 1.66, z);
-      b.box(1.54, 0.14, 0.14, NAVY_D, 1.50, 2.72, z);
-      b.box(1.54, 0.10, 0.10, 0xd8b12a, 1.50, 0.56, z-0.02);  // yellow step edge
+      // door frame, and the yellow the doorway is trimmed with
+      b.box(0.10, 2.44, 0.14, BLK, 0.78, 1.68, z);
+      b.box(0.10, 2.44, 0.14, BLK, 2.22, 1.68, z);
+      b.box(1.54, 0.14, 0.14, BLK, 1.50, 2.90, z);
+      b.box(1.54, 0.10, 0.10, SB_YEL, 1.50, 0.56, z-0.02);    // yellow step edge
+      b.box(0.22, 0.28, 0.04, SB_YEL, 2.22, 2.34, z-0.06);    // the placard by the door
+      b.cyl(0.04,0.04,1.90,8, SB_YEL, 0.90, 1.56, z+0.16);    // grab rails inside the well
+      b.cyl(0.04,0.04,1.90,8, SB_YEL, 2.10, 1.56, z+0.16);
     }
   }
-  flank(-BUS_HW, true);
-  flank( BUS_HW, false);
+  flank(-HW, true);
+  flank( HW, false);
 
-  // ---- wheels ----
-  for (const wx of [4.30, -2.70, -4.05]){
+  // ---- three axles, the rear pair close together, on polished alloys ----
+  for (const wx of SB_AXLE){
+    for (const sz of [1,-1]){
+      b.box(1.30, 0.72, 0.05, 0x141821, wx, 0.70, sz*(HW+0.012));      // the arch, cut into the skirt
+      for (let i=0;i<6;i++){                                           // and its lip, stepped round
+        const a = Math.PI*(0.10 + i*0.16);
+        b.box(0.29, 0.08, 0.06, SB_SIL_D,
+              wx - Math.cos(a)*0.60, 0.52 + Math.sin(a)*0.60, sz*(HW+0.032), 0, 0, Math.PI/2 - a);
+      }
+    }
     for (const wz of [-1.18, 1.18]){
       b.cyl(0.52,0.52,0.30,14, 0x15171b, wx, 0.52, wz, Math.PI/2,0,0);
-      b.cyl(0.26,0.26,0.33,10, 0xa8adb4, wx, 0.52, wz, Math.PI/2,0,0);
+      b.cyl(0.29,0.29,0.33,10, 0xb0b6bf, wx, 0.52, wz, Math.PI/2,0,0);
+      b.cyl(0.11,0.11,0.36,8,  0x9aa0a8, wx, 0.52, wz, Math.PI/2,0,0);
     }
   }
-  b.box(4.6,0.30,2.2, 0x23272d, -3.3, 0.62, 0);  // chassis
+  b.box(9.4,0.28,2.2, 0x23272d, -1.0, 0.30, 0);  // chassis
   return b.build();
 }
 
@@ -1450,52 +1554,65 @@ function makeBus(){
   intMesh.receiveShadow=true; group.add(intMesh);
 
   // glass
+  const {HL,HW,WIN0,WIN1,SPLIT} = SBG, F = SBF, MW = HW*2;
+  const WY=(WIN0+WIN1)/2, WH=WIN1-WIN0, WAIST=(SPLIT+WIN0)/2;
   function glass(w,h,x,y,z,ry,mat){
-    const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h), mat||glassMat);
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h), mat||sbGlassMat);
     m.position.set(x,y,z); m.rotation.y=ry||0; group.add(m); return m;
   }
-  const winRanges = [[-6.13,-4.67],[-4.53,-3.07],[-2.93,-1.47],[-1.33,0.13],[2.29,3.53],[3.67,4.93],[5.07,6.13]];
-  for (const r of winRanges){ const w=r[1]-r[0], cx=(r[0]+r[1])/2;
-    glass(w,0.92,cx,2.26,-BUS_HW-0.005, 0); }
-  const winRangesR = [[-6.13,-4.67],[-4.53,-3.07],[-2.93,-1.47],[-1.33,0.13],[0.27,0.71],[0.85,2.15],[2.29,3.53],[3.67,4.93],[5.07,6.13]];
-  for (const r of winRangesR){ const w=r[1]-r[0], cx=(r[0]+r[1])/2;
-    glass(w,0.92,cx,2.26, BUS_HW+0.005, 0); }
-  (function(){                                   // deeply raked, like the real thing
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(2.40, 0.99), windshieldMat);
+  // the bays between the pillars; the doorway is the one gap on the kerb side
+  const segsDoor = [[-6.14,-4.72],[-4.60,-3.18],[-3.06,-1.64],[-1.52,-0.10],[0.02,0.72],
+                    [2.28,3.56],[3.68,4.90],[5.02,6.14]];
+  const segsOff  = segsDoor.concat([[0.84,2.16]]);
+  for (const r of segsDoor) glass(r[1]-r[0], WH, (r[0]+r[1])/2, WY, -HW-0.005, 0);
+  for (const r of segsOff)  glass(r[1]-r[0], WH, (r[0]+r[1])/2, WY,  HW+0.005, 0);
+  (function(){                                   // one big raked pane, corner to corner
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(2.02, 0.90), sbScreenMat);
     m.rotation.order = 'YXZ';
-    m.rotation.set(-0.24, Math.PI/2, 0);
-    m.position.set(BUS_HL + 0.055, 2.30, 0);
+    m.rotation.set(-0.30, Math.PI/2, 0);
+    m.position.set(HL + 0.055, 2.17, 0);
     group.add(m);
   })();
-  glass(1.86,0.86,-BUS_HL-0.07, 2.35, 0, Math.PI/2, windshieldMat);
+  glass(1.94,0.86,-HL-0.09, 2.40, 0, Math.PI/2, sbScreenMat);
 
   // decals
   function decal(tex,w,h,x,y,z,ry,rx){
     const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h), new THREE.MeshBasicMaterial({map:tex,transparent:true}));
     m.position.set(x,y,z); m.rotation.set(rx||0, ry||0, 0); group.add(m); return m;
   }
-  const ledFront = decal(TEX_LED, 2.18,0.44, BUS_HL+0.075, 3.02, 0, Math.PI/2);
-  decal(TEX_SIGNAL, 1.95,0.24, BUS_HL+0.075, 2.64, 0, Math.PI/2);
-  decal(TEX_FLEET_SD, 0.52,0.13, BUS_HL+0.075, 1.72, 1.02, Math.PI/2);
-  decal(TEX_SCHOOL, 1.24,0.42, BUS_HL+0.125, 0.92, -0.12, Math.PI/2);
-  decal(TEX_PLATE,  0.70,0.23, BUS_HL+0.155, 0.52, -0.12, Math.PI/2);
-  decal(TEX_AT,     1.12,0.28, BUS_HL+0.105, 1.06, 0.80, Math.PI/2);
-  decal(TEX_AT,     1.40,0.35, 4.60, 1.02, -BUS_HW-0.06, Math.PI);
-  const ledSide  = decal(TEX_LED, 1.20,0.30, -1.0, 2.98, BUS_HW+0.06, 0);
+  // Front.  Texture +X maps to world -Z at this rotation, so the fleet number and the
+  // badge land on the offside, where they are on the real thing.
+  const ledFront = decal(TEX_LED, 2.16, F.BLIND_H, HL+0.145, F.BLIND_Y, 0, Math.PI/2);
+  // the plane covers the whole badge panel; the clusters sit out at its ends
+  decal(TEX_SB_LAMPS, 2.40,0.60, HL+0.105, 1.45, 0.00, Math.PI/2);
+  decal(TEX_EV_ROUND, 0.30,0.30, HL+0.11,  1.32, 0.42, Math.PI/2);
+  decal(TEX_FLEET_SD, 0.52,0.13, HL+0.15,  1.68, 0.44, Math.PI/2);
+  decal(TEX_SCHOOL,   1.24,0.40, HL+0.165, 0.86, -0.30, Math.PI/2);
+  decal(TEX_PLATE,    0.70,0.21, HL+0.175, 0.30, -0.10, Math.PI/2);
+  // Sides and back.
+  for (const sz of [1,-1]){
+    const zz = sz*(HW+0.055), ry = sz<0 ? Math.PI : 0;
+    decal(TEX_AT, 1.40,0.35, 3.10, WAIST, zz, ry);
+  }
+  decal(TEX_SIGNAL,   1.30,0.16, -0.20, WAIST, -HW-0.055, Math.PI);
+  decal(TEX_EV_ROUND, 0.62,0.62, -HL-0.10, WAIST+0.02, 0.60, -Math.PI/2);
+  decal(TEX_SCHOOL,   1.10,0.37, -HL-0.10, 0.82, 0.00, -Math.PI/2);
+  decal(TEX_PLATE,    0.70,0.21, -HL-0.12, 0.30, -0.72, -Math.PI/2);
+  const ledSide  = decal(TEX_LED, 0.94,0.21, 0.36, 2.79, -HW-0.06, Math.PI);
 
   // ---- doors: two out-swinging leaves ----
   function leaf(dirX){
     const p = new THREE.Group();
     const bb = new Builder();
     const w=0.70;
-    bb.box(w,2.06,0.07, 0x1b1f27, dirX*w/2, 1.62, 0);
-    bb.box(w,0.10,0.09, 0x1b1f27, dirX*w/2, 0.63, 0);
-    bb.box(0.07,2.06,0.09, 0x1b1f27, dirX*w, 1.62, 0);
-    bb.box(w*0.5,0.06,0.09, 0xd8b12a, dirX*w*0.5, 1.20, -0.03);
+    bb.box(w,2.24,0.07, 0x14171e, dirX*w/2, 1.70, 0);
+    bb.box(w,0.10,0.09, 0x14171e, dirX*w/2, 0.60, 0);
+    bb.box(0.07,2.24,0.09, 0x14171e, dirX*w, 1.70, 0);
+    bb.box(w*0.5,0.06,0.09, SB_YEL, dirX*w*0.5, 1.20, -0.03);
     const m=new THREE.Mesh(bb.build(), VMAT()); m.castShadow=true;
     p.add(m);
-    const gl=new THREE.Mesh(new THREE.PlaneGeometry(w*0.86,1.78), glassMat);
-    gl.position.set(dirX*w/2, 1.66, 0.01); p.add(gl);
+    const gl=new THREE.Mesh(new THREE.PlaneGeometry(w*0.86,1.92), sbGlassMat);
+    gl.position.set(dirX*w/2, 1.72, 0.01); p.add(gl);
     group.add(p);
     return p;
   }
@@ -1624,7 +1741,7 @@ const DDG = {
    player actually pays for. */
 const DDF = { BUMP0:0.30, BUMP1:0.88, PAN0:0.88, PAN1:1.42,
               LSC0:1.42, LSC1:2.34, FAS0:2.34, FAS1:2.86,
-              USC0:2.86, USC1:4.06, BLIND_Y:2.60, BLIND_H:0.44 };
+              USC0:2.86, USC1:4.06, BLIND_Y:2.60, BLIND_H:0.46 };
 
 function buildDDExterior(){
   const b=new Builder();
@@ -1655,9 +1772,11 @@ function buildDDExterior(){
     b.box(0.14, (ROOF+0.02)-F.BUMP1, 0.26, MASK, FX+0.05, ((ROOF+0.02)+F.BUMP1)/2, sz*(HW-0.12));
   b.box(0.14, (ROOF+0.02)-F.USC1, MW, MASK, FX+0.05, ((ROOF+0.02)+F.USC1)/2, 0);   // brow
   // dark liners behind the frame — from the front seat up top you look at the inside
-  // of the mask, and bare amber up there lights the cabin like a hi-vis vest
+  // of the mask, and bare amber up there lights the cabin like a hi-vis vest.  The
+  // pillar liners run the mask's full depth and a centimetre inboard of it, or the
+  // gold side face still shows edge-on from the prize seat.
   for (const sz of [1,-1])
-    b.box(0.08, (ROOF+0.02)-F.BUMP1, 0.26, 0x161c26, FX-0.05, ((ROOF+0.02)+F.BUMP1)/2, sz*(HW-0.12));
+    b.box(0.20, (ROOF+0.02)-F.BUMP1, 0.26, 0x161c26, FX+0.01, ((ROOF+0.02)+F.BUMP1)/2, sz*(HW-0.13));
   b.box(0.08, (ROOF+0.02)-F.USC1, MW, 0x161c26, FX-0.05, ((ROOF+0.02)+F.USC1)/2, 0);
   function panel(y0,y1,col){
     b.box(0.12, y1-y0, MW-2*IN, col, FX+0.02, (y0+y1)/2, 0);
@@ -1668,8 +1787,9 @@ function buildDDExterior(){
   // in and you lose the driver, the front row, and every face behind the glass
   for (const y of [F.USC0+0.035, F.USC1-0.035, F.LSC0+0.035, F.LSC1-0.035])
     b.box(0.12, 0.07, MW-2*IN, BLK, FX+0.02, y, 0);
-  // the blind box sits proud of the screen, so the gaps between its dots stay black
-  b.box(0.06, F.BLIND_H+0.06, 2.18, 0x05060a, FX+0.115, F.BLIND_Y, 0);
+  // the blind box sits proud of the screen, so the gaps between its dots stay black.
+  // It stops short of the mask posts: on the real thing the amber frame runs past it.
+  b.box(0.06, F.BLIND_H+0.06, 2.04, 0x05060a, FX+0.115, F.BLIND_Y, 0);
   // amber valance and its lower lip
   b.box(0.24, F.BUMP1-F.BUMP0, MW+0.06, MASK,   FX+0.06, (F.BUMP0+F.BUMP1)/2, 0);
   b.box(0.26, 0.09, MW+0.07,             MASK_D, FX+0.07, F.BUMP0+0.02, 0);
@@ -1848,7 +1968,7 @@ function makeBusDouble(){
   }
   // front. Texture +X maps to world -Z here, so anything laid on the front reads
   // the right way round with the kerb side on the viewer's left, as in the photo.
-  decal(TEX_NX2,   2.12,F.BLIND_H, HL+0.155, F.BLIND_Y, 0, Math.PI/2);
+  decal(TEX_NX2,   1.98,F.BLIND_H, HL+0.155, F.BLIND_Y, 0, Math.PI/2);
   decal(TEX_FLEETF,0.96,0.15, HL+0.11, 1.31, -0.62, Math.PI/2);
   decal(TEX_BCI,   0.42,0.13, HL+0.11, 1.31,  0.34, Math.PI/2);
   decal(TEX_AT,    1.30,0.33, HL+0.11, 1.05, 0, Math.PI/2);
@@ -1998,48 +2118,74 @@ function atRoundelTexture(){
   g.restore();
   return new THREE.CanvasTexture(c);
 }
-/* The Geely's headlamps are the one thing everybody recognises it by: a thin lit
-   wedge that sits in a black pocket, tall at the outboard end and tapering away
-   to nothing inboard.  Drawn rather than modelled — chop a shape like that into
-   boxes and you get a rectangle with steps on it.  One texture carries both
-   clusters so it costs a single decal across the front. */
+/* The Geely's headlamps are the one thing everybody recognises it by, and they are
+   neither rectangles nor eyes.  The cluster is a long flat wedge — about 0.63 m by
+   0.28 m, so better than two to one — and the outboard end, which is the deep end, is
+   raked hard: its leading edge leans a sixth of the lamp's length back as it falls.
+   That rake is what makes the thing look swept.  From there the top line runs away
+   inboard and downward and the underside stays flat, so the point lands low, at about
+   nine-tenths of the depth.  A second lit line branches off the underside, arches up
+   and dives back to the same point, cutting a slim blade out of the bottom.  The
+   numbers are read straight off the front elevation of NB5944 rather than guessed.
+   Drawn, not modelled: chop a sweep like that into boxes and you get a rectangle with
+   steps on it, which is where this started.  One texture carries both clusters, so the
+   pair costs a single decal, and it is unlit so it reads as emitting rather than as
+   navy paint catching the afternoon. */
 function evLampTexture(){
-  const W=1224, H=200, LW=372, LH=178, TOP=11;
+  const W=2048, H=512, LW=620, LH=280, MX=20, TOP=H-LH-15;   // power of two, so the mips work
   const c=document.createElement('canvas'); c.width=W; c.height=H;
   const g=c.getContext('2d');
+  const X=u=>u*LW, Y=v=>v*LH;                    // lamp space: u runs outboard -> inboard point
   g.clearRect(0,0,W,H);
-  const OUT =[[0.00,0.12],[0.15,0.00],[1.00,0.75],[1.00,0.93],[0.09,1.00]];
-  const KINK=[[0.15,0.58],[0.50,0.88],[0.97,0.84]];
-  function poly(pts, grow){
-    const cx=pts.reduce((s,q)=>s+q[0],0)/pts.length, cy=pts.reduce((s,q)=>s+q[1],0)/pts.length;
+  function outline(){
     g.beginPath();
-    pts.forEach((q,i)=>{ const x=(cx+(q[0]-cx)*grow)*LW, y=(cy+(q[1]-cy)*grow)*LH;
-      i?g.lineTo(x,y):g.moveTo(x,y); });
+    g.moveTo(X(0.020), Y(0.055));
+    g.quadraticCurveTo(X(0.030), Y(0.000), X(0.105), Y(0.012));                   // the shoulder is rounded, not a corner
+    g.bezierCurveTo(X(0.430), Y(0.125), X(0.700), Y(0.300), X(0.934), Y(0.634));  // the long top sweep
+    g.quadraticCurveTo(X(0.996), Y(0.800), X(1.000), Y(0.896));                   // the point
+    g.bezierCurveTo(X(0.750), Y(1.008), X(0.430), Y(1.000), X(0.185), Y(0.878));  // flat underside
+    g.bezierCurveTo(X(0.148), Y(0.680), X(0.070), Y(0.330), X(0.020), Y(0.055));  // the raked outboard edge
     g.closePath();
+  }
+  function blade(){                              // branches off the underside, arches, dives to the point
+    g.beginPath();
+    g.moveTo(X(0.395), Y(0.918));
+    g.bezierCurveTo(X(0.470), Y(0.930), X(0.590), Y(0.760), X(0.712), Y(0.726));
+    g.bezierCurveTo(X(0.820), Y(0.762), X(0.918), Y(0.836), X(0.972), Y(0.884));
   }
   function lamp(x0, mirror){
     g.save(); g.translate(x0, TOP);
     if (mirror){ g.translate(LW,0); g.scale(-1,1); }
-    g.fillStyle='#04060a'; poly(OUT,1.22); g.fill();      // the pocket it sits in
-    g.fillStyle='#0d1420'; poly(OUT,1.08); g.fill();
     g.lineJoin='round'; g.lineCap='round';
-    g.shadowColor='#8fb6ff'; g.shadowBlur=8;
-    g.strokeStyle='#eef4ff'; g.lineWidth=10;
-    poly(OUT,1.0); g.stroke();
-    g.strokeStyle='#dce8ff'; g.lineWidth=7;
-    g.beginPath(); KINK.forEach((q,i)=>{ const x=q[0]*LW,y=q[1]*LH; i?g.lineTo(x,y):g.moveTo(x,y); }); g.stroke();
+    outline(); g.strokeStyle='#04060a'; g.lineWidth=26; g.stroke();     // the pocket it sits in
+    const gr=g.createLinearGradient(0,0,0,LH);
+    gr.addColorStop(0,'#101828'); gr.addColorStop(0.55,'#070d15'); gr.addColorStop(1,'#03050a');
+    g.fillStyle=gr; g.fill();
+    g.save(); outline(); g.clip();
+    g.strokeStyle='rgba(70,92,130,0.28)'; g.lineWidth=4;               // reflector, only just enough to break the void
+    for (let i=0;i<5;i++){ g.beginPath();
+      g.moveTo(X(0.18+i*0.155), Y(0.00)); g.lineTo(X(0.07+i*0.155), Y(1.00)); g.stroke(); }
+    // The projector sits low and well outboard, roughly a third along.  Anything
+    // centred, round and bright turns the cluster into a cartoon eye the moment you
+    // step back from it, which is the trap this whole shape is trying to avoid.
+    g.save(); g.translate(X(0.380),Y(0.700)); g.scale(1, 0.62);
+    const pr=g.createRadialGradient(0,0,0, 0,0, X(0.165));
+    pr.addColorStop(0,'rgba(226,238,255,0.72)'); pr.addColorStop(0.38,'rgba(152,184,228,0.28)');
+    pr.addColorStop(1,'rgba(120,150,200,0)');
+    g.fillStyle=pr; g.fillRect(X(-0.18),Y(-0.60),X(0.36),Y(1.20)); g.restore();
+    g.strokeStyle='#e6eeff'; g.lineWidth=6; g.lineCap='round';
+    g.beginPath(); g.moveTo(X(0.322),Y(0.678)); g.lineTo(X(0.446),Y(0.710)); g.stroke();
+    g.restore();
+    g.shadowColor='rgba(150,186,255,0.8)'; g.shadowBlur=8;
+    g.strokeStyle='#eff4ff'; g.lineWidth=10; outline(); g.stroke();     // the lit perimeter
+    g.strokeStyle='#dbe7fb'; g.lineWidth=8.5; blade(); g.stroke();
     g.shadowBlur=0;
-    g.fillStyle='#c8d9f0';                                 // projector
-    g.beginPath(); g.ellipse(0.26*LW,0.52*LH,0.045*LW,0.095*LH,0,0,6.2832); g.fill();
-    g.fillStyle='#ffb347';                                 // indicator, outboard
-    g.beginPath();
-    g.moveTo(0.070*LW,0.30*LH); g.lineTo(0.100*LW,0.28*LH);
-    g.lineTo(0.125*LW,0.52*LH); g.lineTo(0.095*LW,0.54*LH);
-    g.closePath(); g.fill();
     g.restore();
   }
-  lamp(-16,false); lamp(W-LW+16,true);
-  return new THREE.CanvasTexture(c);
+  lamp(MX,false); lamp(W-LW-MX,true);
+  const t=new THREE.CanvasTexture(c);
+  t.anisotropy = 8;            // it is a thin bright line on a near-flat panel, so it shimmers otherwise
+  return t;
 }
 const TEX_EV_BAND   = evBandTexture(BUS_HL*2);
 const TEX_EV_BAND_R = evBandTexture(BUS_HW*2);
@@ -2097,9 +2243,13 @@ function buildEVExterior(){
     b.box(0.50, c[1]-c[0], 0.11, c[2], FX-0.20, (c[0]+c[1])/2, sz*(HW-0.14), 0, sz*0.70, 0);
   // the blind box stands proud of the screen so the gaps between its dots stay black
   b.box(0.07, F.BLIND_H+0.06, 2.24, 0x05060a, FX+0.10, F.BLIND_Y, 0);
-  // Headlamps are a decal on the badge panel — see evLampTexture.  The lit shape
-  // runs off the edge of the panel on purpose, so it reads as carrying on round
-  // the corner rather than stopping dead short of it.
+  // Headlamps are a decal on the badge panel — see evLampTexture.  Under each of them,
+  // out at the corner, the real bus carries a small separate lamp sunk into the silver;
+  // it is what stops the bumper reading as one blank slab.
+  for (const sz of [1,-1]){
+    b.box(0.02, 0.12, 0.24, 0x555c68, FX+0.145, 0.86, sz*0.85);
+    b.box(0.02, 0.05, 0.15, 0xcfd8e6, FX+0.152, 0.86, sz*0.85);
+  }
   // wipers parked low across the screen
   for (const sz of [1,-1]){
     b.box(0.05,0.05,1.02, 0x15171b, FX+0.12, 1.96, sz*0.54, 0.68);
@@ -2199,7 +2349,9 @@ function makeBusElectric(){
   // Front.  Texture +X maps to world -Z at this rotation, so the fleet number lands on
   // the kerb side of the front, where it is on the real bus.
   const ledFront = decal(TEX871, 2.14, F.BLIND_H, HL+0.145, F.BLIND_Y, 0, Math.PI/2);
-  decal(TEX_EV_LAMPS,  2.08,0.34, HL+0.115, EV_LAMP_Y, 0.00, Math.PI/2);
+  // the plane covers the whole badge panel but the clusters sit low in the texture,
+  // so it has to ride above EV_LAMP_Y for them to land on it
+  decal(TEX_EV_LAMPS,  2.08,0.52, HL+0.105, EV_LAMP_Y+0.083, 0.00, Math.PI/2);
   decal(TEX_EV_FLEETF, 0.86,0.14, HL+0.11, 1.60, -0.74, Math.PI/2);
   decal(TEX_EV_ROUND,  0.34,0.34, HL+0.11, EV_LAMP_Y, 0.00, Math.PI/2);
   decal(TEX_EV_PLATE,  0.70,0.23, HL+0.16, 0.58,  0.00, Math.PI/2);
