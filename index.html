@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>gooselake.xyz</title>
+<title>westlakeboys.xyz</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   html,body { width:100%; height:100%; overflow:hidden; background:#0a0f18;
@@ -538,7 +538,7 @@
     <i>&#10549;</i></div>
   <div id="tuiPad"></div>
 </div>
-<div id="tuiRotate"><div><b>TURN YOUR PHONE</b><span>gooselake.xyz plays sideways.<br>Rotate to landscape to start the day.</span></div></div>
+<div id="tuiRotate"><div><b>TURN YOUR PHONE</b><span>westlakeboys.xyz plays sideways.<br>Rotate to landscape to start the day.</span></div></div>
 <div id="sceneTitle" class="hidden"></div>
 <div id="jumpFx" class="hidden">
   <div id="jumpBig">&minus;10 AURA</div>
@@ -575,7 +575,7 @@
 
 <div id="startOver" class="over hidden">
   <div class="card">
-    <h1 id="gameTitle">gooselake<em>.xyz</em></h1>
+    <h1 id="gameTitle">westlakeboys<em>.xyz</em></h1>
     <div class="tag" style="margin:8px 0 0">GooseLake Boys' High School &middot; Monday, period one</div>
     <div id="bigKeys">
       <div class="bk"><b>W A S D</b><span>MOVE</span></div>
@@ -621,7 +621,7 @@
 
 <div id="lbOver" class="over hidden">
   <div class="card" id="lbCard">
-    <div class="tag">gooselake.xyz &middot; the board</div>
+    <div class="tag">westlakeboys.xyz &middot; the board</div>
     <h1>TOP <em>AURA</em></h1>
     <div id="lbForm" class="hidden">
       <div class="lbYou">You scored <b id="lbMyAura">0</b> &middot; <span id="lbMyGrade">Achieved</span></div>
@@ -1019,6 +1019,34 @@ const SHIRT  = 0xf2f2ee;
 const TIE     = 0x9d1f26;
 const TROUSER = 0x1c1e22;
 
+/* The school badge on the breast pocket.  Merged into the body geometry, so a
+   hall of five hundred boys still costs nothing extra to draw.  At the size this
+   renders it is a gold-edged shield with a dark neck standing off a pale body —
+   which is exactly how a real blazer crest reads from more than a metre away. */
+const BADGE_FIELD = 0x1d5c4f, BADGE_GOLD = 0xd9a83a,
+      BADGE_DARK  = 0x101f1c, BADGE_BUFF = 0xefe6cf, BADGE_WING = 0xb5a67c;
+function blazerBadge(b, x, y, z, k){
+  /* Worn big and central, so the goose has to be a goose rather than a smudge:
+     pale body, upright neck, head with a beak, and the white chinstrap that is
+     the whole difference between this bird and a swan. */
+  const u = k || 1;
+  /* dz of exactly 0 is falsy, so this cannot use || for the default — the gold
+     edge ended up in front of the field and the badge was a yellow slab. */
+  /* The layers need real daylight between them: at 1 mm the depth buffer picked
+     the gold edge over the field from some angles and the badge went yellow. */
+  const B = (w,h,c,dx,dy,dz) =>
+    b.box(w*u, h*u, 0.006, c, x+dx*u, y+dy*u, z + (dz === undefined ? 0.008 : dz));
+  B(0.098, 0.112, BADGE_GOLD,  0,      0,      0.000);   // gold edge
+  B(0.082, 0.094, BADGE_FIELD, 0,      0.004,  0.004);   // teal field
+  B(0.018, 0.016, BADGE_DARK,  0.036, -0.012);           // tail
+  B(0.060, 0.028, BADGE_BUFF,  0.004, -0.021);           // body
+  B(0.044, 0.012, BADGE_WING,  0.010, -0.016);           // folded wing
+  B(0.016, 0.046, BADGE_DARK, -0.010,  0.011);           // neck
+  B(0.030, 0.024, BADGE_DARK, -0.016,  0.042);           // head
+  B(0.015, 0.009, BADGE_DARK, -0.036,  0.040);           // beak
+  B(0.013, 0.010, BADGE_BUFF, -0.018,  0.033, 0.011);    // chinstrap, over the jaw
+}
+
 function buildStudent(o){
   const b=new Builder();
   const skin=o.skin, hair=o.hair, pack=o.pack, jump=o.jump;
@@ -1039,7 +1067,8 @@ function buildStudent(o){
   b.box(0.30,0.115,0.245, SHIRT, 0, 1.40, 0.005);   // collar
   b.box(0.115,0.075,0.10, SHIRT, 0, 1.365, 0.125);  // collar points
   b.box(0.072,0.075,0.03, TIE,   0, 1.345, 0.145);  // knot
-  b.box(0.062,0.235,0.02, TIE,   0, 1.205, 0.145);  // tie blade
+  b.box(0.062,0.090,0.02, TIE,   0, 1.280, 0.145);  // tie blade — the jumper eats the rest
+  blazerBadge(b, 0, 1.055, 0.134, 2.75);            // the goose, big, across the chest
   // arms
   b.box(0.125,0.545,0.155, jump, -0.285, 1.055, 0.01);
   b.box(0.125,0.545,0.155, jump,  0.285, 1.055, 0.01);
@@ -1473,7 +1502,8 @@ function buildSeated(){
   const b=new Builder();
   b.box(0.42,0.52,0.26, o.jump, 0, 0.30, 0);
   b.box(0.28,0.10,0.24, SHIRT, 0, 0.60, 0.005);
-  b.box(0.058,0.20,0.02, TIE,  0, 0.44, 0.14);
+  b.box(0.058,0.080,0.02, TIE,  0, 0.505, 0.14);
+  blazerBadge(b, 0, 0.300, 0.131, 2.45);            // the goose, big, across the chest
   b.box(0.22,0.26,0.22, o.skin, 0, 0.79, 0);
   b.box(0.035,0.03,0.02, 0x1a1a1a, -0.052, 0.805, 0.112);
   b.box(0.035,0.03,0.02, 0x1a1a1a,  0.052, 0.805, 0.112);
@@ -4174,7 +4204,7 @@ const BOARD_SUPPORTERS = { title:'SUPPORTERS',
    did more than repost — short on purpose, so a name on it means something. */
 const BOARD_SPECIAL = { title:'SPECIAL\nSUPPORTERS',
   rows:[ {n:'TRISTAN MONA'} ],
-  note:'Went above and beyond for gooselake.xyz.' };
+  note:'Went above and beyond for westlakeboys.xyz.' };
 
 function fitFont(g, txt, maxW, px, weight, fam){
   for (let sz = px; sz > 8; sz -= 1){
@@ -4228,7 +4258,7 @@ function paintHallLB(g){
   g.textAlign = 'center';
   if (!rows || !rows.length){
     g.fillStyle = '#e9d6ac'; g.font = 'italic 600 30px Georgia, serif';
-    g.fillText(rows ? 'Nobody on the board yet.' : 'gooselake.xyz', W/2, 700);
+    g.fillText(rows ? 'Nobody on the board yet.' : 'westlakeboys.xyz', W/2, 700);
     g.fillText(rows ? 'Be the first.' : 'Play to put a name up here.', W/2, 746);
     g.textAlign = 'left';
     return;
@@ -9099,7 +9129,7 @@ const DET_QS = [
     a:['Yes \u2014 THEY\u2019RE FORCING ME TO LINE UP', 'No \u2014 I listen to them'],
     c:1, why:'No. Goooood booooyyyyyy.' },
   { q:'Will you do your homework?',
-    a:['Yes \u2014 it is fun lol', 'No \u2014 I would rather play gooselake.xyz'],
+    a:['Yes \u2014 it is fun lol', 'No \u2014 I would rather play westlakeboys.xyz'],
     c:0, why:'Yes. Say it like you mean it.' }
 ];
 /* Four RIGHT answers, not four answers.  Get one wrong and it goes to the back
@@ -11829,7 +11859,7 @@ if (__DEV) window.__BBB = { G, camera, buses, agents, scene, renderer, Audio_,
   AURA_LOG,
   FIN_GOOD, FIN_BAD,
   lunchKiosk, lunchOrder, tuiHitKiosk, LUN, Lunch,
-  boardTexture, slideTexture, kiwiSlideTexture, hallSlideShow, SLIDE_TEX, KIWI_SLIDE_SRC, drawCrest,
+  studentMat, buildStanding, buildSeated, boardTexture, slideTexture, kiwiSlideTexture, hallSlideShow, SLIDE_TEX, KIWI_SLIDE_SRC, drawCrest,
   BOARD_DEVELOPERS, BOARD_SUPPORTERS, BOARD_SPECIAL, Hall,
   HEAD_KIWIHACKS, HEAD_KIWIHACKS_ODDS, startRecog, animRecog, updateHall,
   paintHallLB, repaintHallLB, hallLBTexture,
