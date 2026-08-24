@@ -1228,6 +1228,10 @@ const TEX_PLATE  = plateTexture('KDL491', '#f2f2ee', '#15181d', false);
 const TEX_AT     = atLogoTexture();
 const TEX_SIGNAL = signalStripTexture();
 const TEX_FLEET_SD = fleetTexture('GB5417');   // the single-decker's fleet number
+// The older body and the NX2-liveried 033 are separate vehicles, so they carry their own
+// numbers and plates — two buses on stage at once with the same plate reads as a bug.
+const TEX_FLEET_OLD  = fleetTexture('GB5209');
+const TEX_PLATE_OLD  = plateTexture('JHT724', '#f2f2ee', '#15181d', false);
 
 const glassMat = new THREE.MeshLambertMaterial({color:0x11161f, transparent:true, opacity:0.46, side:THREE.DoubleSide, depthWrite:false});
 const windshieldMat = new THREE.MeshLambertMaterial({color:0x1a2130, transparent:true, opacity:0.42, side:THREE.DoubleSide, depthWrite:false});
@@ -1583,11 +1587,15 @@ function makeBus(){
   // Front.  Texture +X maps to world -Z at this rotation, so the fleet number and the
   // badge land on the offside, where they are on the real thing.
   const ledFront = decal(TEX_LED, 2.16, F.BLIND_H, HL+0.145, F.BLIND_Y, 0, Math.PI/2);
-  // the plane covers the whole badge panel; the clusters sit out at its ends
-  decal(TEX_SB_LAMPS, 2.40,0.60, HL+0.105, 1.45, 0.00, Math.PI/2);
+  // The clusters ride low in the silver, level with the board and clear of the pinstripe.
+  // Hung any higher the amber climbs onto the navy and the pair read as eyes on the face,
+  // which is the one thing the real bus does not do.  The bumper stands 6 cm proud of the
+  // panel above it, so the plane has to clear that too.
+  decal(TEX_SB_LAMPS, 2.40,0.60, HL+0.18, 0.86, 0.00, Math.PI/2);
   decal(TEX_EV_ROUND, 0.30,0.30, HL+0.11,  1.32, 0.42, Math.PI/2);
   decal(TEX_FLEET_SD, 0.52,0.13, HL+0.15,  1.68, 0.44, Math.PI/2);
-  decal(TEX_SCHOOL,   1.24,0.40, HL+0.165, 0.86, -0.30, Math.PI/2);
+  // and the board pulls in to the centre to leave them the ends of the bumper
+  decal(TEX_SCHOOL,   1.06,0.34, HL+0.165, 0.83, 0.00, Math.PI/2);
   decal(TEX_PLATE,    0.70,0.21, HL+0.175, 0.30, -0.10, Math.PI/2);
   // Sides and back.
   for (const sz of [1,-1]){
@@ -1654,6 +1662,236 @@ function makeBus(){
     setRoute(r){
       this.route = r;
       const tex = TEX_ROUTE[r.n];
+      ledFront.material.map = tex; ledFront.material.needsUpdate = true;
+      ledSide.material.map  = tex; ledSide.material.needsUpdate  = true;
+    }
+  };
+}
+
+
+/* ============================================================
+   5a-ii.  THE OLDER SCHOOL BUS  (034, 049, 449)
+   ============================================================ */
+/* AT does not run one bus.  This is the older body the school runs used to turn up in
+   before the low-floor rebuild: squarer, navy roof instead of a pale dome, separate
+   windows rather than one ribbon, and three round lamps a side low in the bumper.
+   It is kept as it was rather than restyled, because half the point of having two of
+   them is that you can tell at fifty metres which one has pulled in.
+   Everything below the skin — floor, seats, door well, ride position — is the shared
+   single-deck fit-out, so boarding is identical whichever arrives. */
+
+/* Its blind is the older box: coarser dots, no fitted measuring, and the wording set
+   in a plain left column.  Kept because the blind is half of what dates the bus. */
+function ledTextureOld(num, dest){
+  const c=document.createElement('canvas'); c.width=512; c.height=128;
+  const g=c.getContext('2d');
+  g.fillStyle='#05060a'; g.fillRect(0,0,512,128);
+  g.fillStyle='#ffd27a'; g.textAlign='left';
+  if (dest){
+    g.font='bold 44px "Segoe UI",sans-serif'; g.fillText('School Bus', 14, 52);
+    g.font='bold 34px "Segoe UI",sans-serif'; g.fillText(dest, 14, 100);
+  } else {
+    g.font='bold 52px "Segoe UI",sans-serif'; g.fillText('School Bus', 14, 82);
+  }
+  g.textAlign='right'; g.font='bold 82px "Segoe UI",sans-serif'; g.fillText(num||'04', 500, 86);
+  // dot-matrix mask
+  g.globalCompositeOperation='destination-out'; g.fillStyle='#000';
+  for (let y=0;y<128;y+=4) g.fillRect(0,y+2,512,2);
+  for (let x=0;x<512;x+=4) g.fillRect(x+2,0,2,128);
+  g.globalCompositeOperation='source-over';
+  return new THREE.CanvasTexture(c);
+}
+// only the three runs it works, so the modern pair are not paying for blinds nobody sees
+const TEX_ROUTE_OLD = {};
+for (const n of ['034','049','449']){
+  const r = SCHOOL_ROUTES.find(x=>x.n===n);
+  TEX_ROUTE_OLD[n] = ledTextureOld(n, r ? r.dest : null);
+}
+const TEX_LED_OLD = TEX_ROUTE_OLD['049'];
+
+function buildOldBusExterior(){
+  const b=new Builder();
+  const L=12.4, HW=BUS_HW, W=HW*2;
+  // ---- roof + rear + front shells ----
+  b.box(L, 0.14, W, NAVY, 0, 3.36, 0);
+  b.box(L*0.86, 0.10, W*0.78, 0x2a3a5e, -0.6, 3.44, 0);   // roof hatch strip
+  b.box(0.10, 2.05, W, NAVY, -BUS_HL, 2.32, 0);           // rear upper
+  b.box(0.10, 0.88, W, SILVER, -BUS_HL, 0.86, 0);         // rear lower
+  b.box(0.12, 0.9, 1.9, NAVY_D, -BUS_HL-0.01, 2.35, 0);  // rear window frame
+  b.box(0.10, 0.24, 0.4, 0x8b1f24, -BUS_HL-0.03, 1.45,  0.85);
+  b.box(0.10, 0.24, 0.4, 0x8b1f24, -BUS_HL-0.03, 1.45, -0.85);
+  // ---- front ----
+  const FX = BUS_HL, BLK = 0x0b0d10;
+  // the whole top of the front is one black glass band with the sign inside it
+  b.box(0.13, 0.78, W,      BLK,    FX+0.005, 2.90, 0);
+  b.box(0.15, 0.05, W*1.01, 0x191d25, FX+0.02, 2.71, 0);        // seam under the sign
+  b.box(0.16, 0.10, W,      NAVY_D, FX+0.01, 3.31, 0);          // navy lip at the roof
+  // the windscreen: a deep raked recess with dark pillars either side
+  b.box(0.19, 0.98, 0.16,   0x14181f, FX+0.01, 2.28,  HW-0.07); // A-pillars
+  b.box(0.19, 0.98, 0.16,   0x14181f, FX+0.01, 2.28, -HW+0.07);
+  b.box(0.20, 0.09, W,      0x14181f, FX+0.02, 1.80, 0);        // sill under the glass
+  // navy between the screen and the silver
+  b.box(0.13, 0.62, W, NAVY,   FX, 1.44, 0);
+  // silver lower front, and the bumper
+  b.box(0.17, 0.86, W, SILVER, FX+0.02, 0.78, 0);
+  b.box(0.21, 0.32, W*1.01, SILVER_D, FX+0.05, 0.40, 0);
+  b.box(0.10, 0.05, W*1.01, 0x6f767e, FX+0.10, 0.56, 0);
+  // round lamp clusters, three a side, outer one amber
+  for (const sz of [1,-1]){
+    for (let i=0;i<3;i++){
+      const zz = sz*(0.66 + i*0.235);
+      b.cyl(0.115,0.115,0.09,12, 0x2a2e35, FX+0.09, 0.62, zz, 0,0,Math.PI/2);
+      b.cyl(0.088,0.088,0.10,12, i===2? 0xffb35c : 0xf7f2df, FX+0.115, 0.62, zz, 0,0,Math.PI/2);
+    }
+  }
+  // wipers parked across the bottom of the screen
+  b.box(0.05,0.035,1.15, 0x15171b, FX+0.10, 1.86,  0.42, 0,0,0);
+  b.box(0.05,0.035,1.15, 0x15171b, FX+0.10, 1.86, -0.42, 0,0,0);
+  // mirrors
+  b.cyl(0.03,0.03,0.75,6, 0x1b1e24, BUS_HL-0.35, 2.85, -HW-0.18, 0,0,0.25);
+  b.box(0.08,0.42,0.24, 0x1b1e24, BUS_HL-0.52, 2.52, -HW-0.34);
+  b.cyl(0.03,0.03,0.75,6, 0x1b1e24, BUS_HL-0.35, 2.85,  HW+0.18, 0,0,-0.25);
+  b.box(0.08,0.42,0.24, 0x1b1e24, BUS_HL-0.52, 2.52,  HW+0.34);
+
+  // ---- flanks ----
+  function flank(z, hasDoor){
+    const segs = hasDoor ? [[-BUS_HL, 0.78],[2.22, BUS_HL]] : [[-BUS_HL, BUS_HL]];
+    for (const s of segs){
+      const w=s[1]-s[0], cx=(s[0]+s[1])/2;
+      b.box(w, 0.88, 0.09, SILVER, cx, 0.86, z);        // silver skirt
+      b.box(w, 0.10, 0.11, SILVER_D, cx, 0.44, z);
+      b.box(w, 0.50, 0.09, NAVY, cx, 1.55, z);          // navy under window
+    }
+    b.box(BUS_HL*2, 0.66, 0.09, NAVY, 0, 3.03, z);      // navy above window
+    // window pillars
+    const pillars=[-6.20,-4.60,-3.00,-1.40,0.20,0.78,2.22,3.60,5.00,6.20];
+    for (const px of pillars) b.box(0.13, 0.98, 0.10, NAVY, px, 2.26, z);
+    if (hasDoor){
+      // the bulkhead across the back of the entrance well, with a grab pole
+      const bz = z + (DOOR_BACK - (BUS_Z - BUS_HW));       // door well depth, in bus-local Z
+      b.box(1.44, 0.98, 0.10, 0x2b3038, 1.50, 0.98, bz);
+      b.box(1.44, 0.08, 0.14, 0x3d434c, 1.50, 1.48, bz);
+      b.cyl(0.045,0.045,2.00,8, 0xd8b12a, 1.50, 1.52, bz-0.10);
+      b.box(0.42,0.34,0.16, 0x1f242c, 0.98, 1.30, bz-0.08);   // the ticket machine
+      b.box(0.30,0.16,0.03, 0x2f7ac4, 0.98, 1.36, bz-0.17);
+      // door frame
+      b.box(0.10, 2.20, 0.14, NAVY_D, 0.78, 1.66, z);
+      b.box(0.10, 2.20, 0.14, NAVY_D, 2.22, 1.66, z);
+      b.box(1.54, 0.14, 0.14, NAVY_D, 1.50, 2.72, z);
+      b.box(1.54, 0.10, 0.10, 0xd8b12a, 1.50, 0.56, z-0.02);  // yellow step edge
+    }
+  }
+  flank(-BUS_HW, true);
+  flank( BUS_HW, false);
+
+  // ---- wheels ----
+  for (const wx of [4.30, -2.70, -4.05]){
+    for (const wz of [-1.18, 1.18]){
+      b.cyl(0.52,0.52,0.30,14, 0x15171b, wx, 0.52, wz, Math.PI/2,0,0);
+      b.cyl(0.26,0.26,0.33,10, 0xa8adb4, wx, 0.52, wz, Math.PI/2,0,0);
+    }
+  }
+  b.box(4.6,0.30,2.2, 0x23272d, -3.3, 0.62, 0);  // chassis
+  return b.build();
+}
+
+function makeBusOld(){
+  const group = new THREE.Group();
+  const ext = new THREE.Mesh(buildOldBusExterior(), VMAT());
+  ext.castShadow=true; ext.receiveShadow=true; group.add(ext);
+
+  const interior = buildBusInterior();
+  const intMesh = new THREE.Mesh(interior.geo, VMAT({side:THREE.DoubleSide}));
+  intMesh.receiveShadow=true; group.add(intMesh);
+
+  // glass
+  function glass(w,h,x,y,z,ry,mat){
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h), mat||glassMat);
+    m.position.set(x,y,z); m.rotation.y=ry||0; group.add(m); return m;
+  }
+  const winRanges = [[-6.13,-4.67],[-4.53,-3.07],[-2.93,-1.47],[-1.33,0.13],[2.29,3.53],[3.67,4.93],[5.07,6.13]];
+  for (const r of winRanges){ const w=r[1]-r[0], cx=(r[0]+r[1])/2;
+    glass(w,0.92,cx,2.26,-BUS_HW-0.005, 0); }
+  const winRangesR = [[-6.13,-4.67],[-4.53,-3.07],[-2.93,-1.47],[-1.33,0.13],[0.27,0.71],[0.85,2.15],[2.29,3.53],[3.67,4.93],[5.07,6.13]];
+  for (const r of winRangesR){ const w=r[1]-r[0], cx=(r[0]+r[1])/2;
+    glass(w,0.92,cx,2.26, BUS_HW+0.005, 0); }
+  (function(){                                   // deeply raked, like the real thing
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(2.40, 0.99), windshieldMat);
+    m.rotation.order = 'YXZ';
+    m.rotation.set(-0.24, Math.PI/2, 0);
+    m.position.set(BUS_HL + 0.055, 2.30, 0);
+    group.add(m);
+  })();
+  glass(1.86,0.86,-BUS_HL-0.07, 2.35, 0, Math.PI/2, windshieldMat);
+
+  // decals
+  function decal(tex,w,h,x,y,z,ry,rx){
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h), new THREE.MeshBasicMaterial({map:tex,transparent:true}));
+    m.position.set(x,y,z); m.rotation.set(rx||0, ry||0, 0); group.add(m); return m;
+  }
+  const ledFront = decal(TEX_LED_OLD, 2.18,0.44, BUS_HL+0.075, 3.02, 0, Math.PI/2);
+  decal(TEX_SIGNAL, 1.95,0.24, BUS_HL+0.075, 2.64, 0, Math.PI/2);
+  decal(TEX_FLEET_OLD, 0.52,0.13, BUS_HL+0.075, 1.72, 1.02, Math.PI/2);
+  decal(TEX_SCHOOL, 1.24,0.42, BUS_HL+0.125, 0.92, -0.12, Math.PI/2);
+  decal(TEX_PLATE_OLD, 0.70,0.23, BUS_HL+0.155, 0.52, -0.12, Math.PI/2);
+  decal(TEX_AT,     1.12,0.28, BUS_HL+0.105, 1.06, 0.80, Math.PI/2);
+  decal(TEX_AT,     1.40,0.35, 4.60, 1.02, -BUS_HW-0.06, Math.PI);
+  const ledSide  = decal(TEX_LED_OLD, 1.20,0.30, -1.0, 2.98, BUS_HW+0.06, 0);
+
+  // ---- doors: two out-swinging leaves ----
+  function leaf(dirX){
+    const p = new THREE.Group();
+    const bb = new Builder();
+    const w=0.70;
+    bb.box(w,2.06,0.07, 0x1b1f27, dirX*w/2, 1.62, 0);
+    bb.box(w,0.10,0.09, 0x1b1f27, dirX*w/2, 0.63, 0);
+    bb.box(0.07,2.06,0.09, 0x1b1f27, dirX*w, 1.62, 0);
+    bb.box(w*0.5,0.06,0.09, 0xd8b12a, dirX*w*0.5, 1.20, -0.03);
+    const m=new THREE.Mesh(bb.build(), VMAT()); m.castShadow=true;
+    p.add(m);
+    const gl=new THREE.Mesh(new THREE.PlaneGeometry(w*0.86,1.78), glassMat);
+    gl.position.set(dirX*w/2, 1.66, 0.01); p.add(gl);
+    group.add(p);
+    return p;
+  }
+  const doorA = leaf( 1); doorA.position.set(0.78, 0, -BUS_HW-0.04);
+  const doorB = leaf(-1); doorB.position.set(2.22, 0, -BUS_HW-0.04);
+
+  const FIT = fitOutSingleDeck(group, interior);
+  const occupants = FIT.occupants, BASE_LOAD = FIT.baseLoad;
+  const RIDE_X = FIT.RIDE_X, RIDE_Z = FIT.RIDE_Z;
+  // soft cabin lighting so the interior reads from inside and through the glass
+  for (const lx of [3.4, 0.2, -3.2]){
+    const pl = new THREE.PointLight(0xfff1d8, 0.62, 7.5, 2);
+    pl.position.set(lx, 2.80, 0); group.add(pl);
+  }
+  const driver = new THREE.Mesh(buildDriver(), studentMat);
+  driver.position.set(4.62, 1.60, 0.72); driver.rotation.y = -Math.PI/2;
+  group.add(driver);
+
+  scene.add(group);
+  return {
+    group, doorA, doorB, occupants, doorT:0,
+    setDoor(t){
+      this.doorT=t;
+      const a = t*1.75;
+      doorA.rotation.y =  a;
+      doorB.rotation.y = -a;
+    },
+    capacity: occupants.length,
+    isDouble: false, seatCount: 20, baseLoad: BASE_LOAD,
+    ridePos: { x: RIDE_X, y: 1.02 + 1.52, z: RIDE_Z },
+    frontSeats: [],
+    fill(n){ for (let i=0;i<this.occupants.length;i++){
+      const o=this.occupants[i]; o.visible = (i<n) && !o.userData.taken; } },
+    setBoarded(n){ this.fill(this.baseLoad + n); },
+    setLoad(){ this.fill(this.baseLoad); },
+    releaseSeats(){ for (const o of this.occupants) o.userData.taken=false; },
+    setFront(){}, clearFront(){},
+    route: SCHOOL_ROUTES[3],
+    setRoute(r){
+      this.route = r;
+      const tex = TEX_ROUTE_OLD[r.n] || TEX_ROUTE[r.n];
       ledFront.material.map = tex; ledFront.material.needsUpdate = true;
       ledSide.material.map  = tex; ledSide.material.needsUpdate  = true;
     }
@@ -2062,6 +2300,254 @@ function makeBusDouble(){
 
 
 /* ============================================================
+   5b-i.  THE 033  —  an NX2 in school clothes
+   ============================================================ */
+/* Same coachbuilder as the NX2 and it shows: the deep navy, the near-black glazing,
+   the white capping roof, and above all the mask — a frame of posts and a brow round
+   an open screen, sitting on a valance that wraps the corners.  What it does not have
+   is the Northern Express amber.  A school run does not get the express colours, so
+   the mask and the valance come out in silver instead, and there is one deck.
+   The shell underneath is the school buses' — same length, same doorway, same saloon —
+   so it boards exactly as they do. */
+// The amber, in silver.  Kept a shade off white or it merges with the capping roof.
+const NXS_MASK = 0xb9c0ca, NXS_MASK_D = 0x969da7;
+const NXS = {
+  HL: BUS_HL, HW: BUS_HW,
+  BODY_B: 0.28,
+  SKIRT_T: 0.96,                // top of the grey skirt, about wheel-centre height
+  WIN0:   1.80, WIN1: 2.92,     // the glazing ribbon
+  ROOF:   3.30
+};
+/* front elevation, bottom up: silver valance, navy panel, screen, silver brow.
+   The blind lives in the top of the screen aperture, as it must on a single-decker —
+   there is no inter-deck fascia to put it in. */
+const NXSF = { BUMP0:0.28, BUMP1:0.96, PAN0:0.96, PAN1:1.74,
+               SCR0:1.74, SCR1:3.06, BLIND_Y:2.76, BLIND_H:0.46 };
+const NXS_PIL  = [-6.20,-4.66,-3.12,-1.58,-0.04,0.78,2.22,3.62,4.96,6.20];
+const TEX_NXS_FLEET = wordTexture('TR3560', 82, '#eef2f7');
+const TEX_NXS_PLATE = plateTexture('MRK208', '#f2f2ee', '#15181d', false);
+
+function buildNXSExterior(){
+  const b=new Builder();
+  const {HL,HW,BODY_B,SKIRT_T,WIN0,WIN1,ROOF} = NXS;
+  const F = NXSF, MW = HW*2, FX = HL, IN = 0.22;
+  const BLK = 0x0b0e14;                        // window rubber and glazing recesses
+  const ROOFW = 0xdfe3e7, ROOFW_T = 0xeef1f4;
+
+  // ---- roof: white, and proud of the sides so it caps the body, as on the NX2 ----
+  b.box(HL*2+0.04, 0.16, MW+0.06, ROOFW,   0,    ROOF+0.08, 0);
+  b.box(HL*1.52,   0.08, MW*0.70, ROOFW_T, -0.9, ROOF+0.19, 0);
+
+  // ---- rear ----
+  b.box(0.12, ROOF-SKIRT_T,   MW, NAVY2,     -HL, (SKIRT_T+ROOF)/2, 0);
+  b.box(0.12, SKIRT_T-BODY_B, MW, SKIRTC,    -HL, (BODY_B+SKIRT_T)/2, 0);
+  b.box(0.13, 0.06, MW,           SKIRTC_D,  -HL, SKIRT_T, 0);
+  b.box(0.09, WIN1-WIN0, 2.04,    BLK, -HL-0.035, (WIN0+WIN1)/2, 0);
+  for (const sz of [1,-1]) b.box(0.10, 0.26, 0.42, 0x8b1f24, -HL-0.06, 1.36, sz*0.86);
+
+  // ---- front ----
+  // The mask is a frame, not a plate: posts up the corners and a brow across the top,
+  // with the screen left open between them.  Fill it and you lose the driver.
+  for (const sz of [1,-1])
+    b.box(0.14, (ROOF+0.02)-F.BUMP1, 0.26, NXS_MASK, FX+0.05, ((ROOF+0.02)+F.BUMP1)/2, sz*(HW-0.12));
+  b.box(0.14, (ROOF+0.02)-F.SCR1, MW, NXS_MASK, FX+0.05, ((ROOF+0.02)+F.SCR1)/2, 0);   // brow
+  // dark liners behind the frame, or the silver side faces show edge-on from inside
+  for (const sz of [1,-1])
+    b.box(0.20, (ROOF+0.02)-F.BUMP1, 0.26, 0x161c26, FX+0.01, ((ROOF+0.02)+F.BUMP1)/2, sz*(HW-0.13));
+  b.box(0.08, (ROOF+0.02)-F.SCR1, MW, 0x161c26, FX-0.05, ((ROOF+0.02)+F.SCR1)/2, 0);
+  b.box(0.12, F.PAN1-F.PAN0, MW-2*IN, NAVY2, FX+0.02, (F.PAN0+F.PAN1)/2, 0);   // fleet / AT Metro panel
+  for (const y of [F.SCR0+0.035, F.SCR1-0.035])                                 // screen rubbers
+    b.box(0.12, 0.07, MW-2*IN, BLK, FX+0.02, y, 0);
+  // the blind box stands proud of the screen so the gaps between its dots stay black
+  b.box(0.06, F.BLIND_H+0.06, 2.04, 0x05060a, FX+0.115, F.BLIND_Y, 0);
+  // silver valance and its lower lip
+  b.box(0.24, F.BUMP1-F.BUMP0, MW+0.06, NXS_MASK,   FX+0.06, (F.BUMP0+F.BUMP1)/2, 0);
+  b.box(0.26, 0.09, MW+0.07,             NXS_MASK_D, FX+0.07, F.BUMP0+0.02, 0);
+  // headlamps sunk into the valance, indicator below — down at the bumper, as they are
+  // on the NX2 and as the other two now wear theirs
+  for (const sz of [1,-1]){
+    b.box(0.09, 0.28, 0.60, 0x15181e, FX+0.145, 0.62, sz*0.86);
+    b.cyl(0.105,0.105,0.07,12, 0xfff3d4, FX+0.20, 0.65, sz*0.99, 0,0,Math.PI/2);
+    b.cyl(0.075,0.075,0.07,12, 0xffd79a, FX+0.20, 0.65, sz*0.73, 0,0,Math.PI/2);
+    b.box(0.08, 0.11, 0.28, 0xffb35c, FX+0.175, 0.41, sz*1.00);
+  }
+  // the silver wraps a little way round each front corner
+  for (const sz of [1,-1])
+    b.box(0.18, (ROOF-0.06)-F.BUMP0, 0.10, NXS_MASK, FX-0.11, ((ROOF-0.06)+F.BUMP0)/2, sz*(HW+0.005));
+  // wipers parked low across the screen, both raked the same way
+  for (const sz of [1,-1]){
+    b.box(0.05,0.05,0.98, 0x15171b, FX+0.11, 1.92, sz*0.52, 0.72);
+    b.box(0.06,0.16,0.07, 0x15171b, FX+0.11, 1.74, sz*0.52);
+  }
+  // mirrors: big black heads out on stalks, NX2 pattern
+  for (const sz of [1,-1]){
+    b.cyl(0.04,0.04,0.66,6, 0x1b1e24, FX-0.12, 2.98, sz*(HW+0.24), 0,0,-sz*0.34);
+    b.box(0.10,0.64,0.30, 0x1b1e24, FX-0.28, 2.66, sz*(HW+0.44));
+    b.box(0.03,0.52,0.22, 0x3a4049, FX-0.34, 2.66, sz*(HW+0.44));
+  }
+
+  // ---- flanks ----
+  function flank(z, hasDoor){
+    const segs = hasDoor ? [[-HL, 0.78],[2.22, HL]] : [[-HL, HL]];
+    for (const s of segs){
+      const w=s[1]-s[0], cx=(s[0]+s[1])/2;
+      b.box(w, SKIRT_T-BODY_B, 0.09, SKIRTC,   cx, (BODY_B+SKIRT_T)/2, z);
+      b.box(w, 0.06, 0.11,           SKIRTC_D, cx, SKIRT_T, z);
+      b.box(w, WIN0-SKIRT_T,   0.09, NAVY2,    cx, (SKIRT_T+WIN0)/2, z);
+    }
+    b.box(HL*2, ROOF-WIN1, 0.09, NAVY2, 0, (WIN1+ROOF)/2, z);
+    // black rubbers top and bottom plus black pillars: the flank has to read as one
+    // dark ribbon, which is the NX2's whole trick and the reason its glass is so dark
+    for (const y of [WIN0+0.025, WIN1-0.025]) b.box(HL*2, 0.05, 0.11, BLK, 0, y, z);
+    for (const px of NXS_PIL) b.box(0.11, WIN1-WIN0, 0.10, BLK, px, (WIN0+WIN1)/2, z);
+    if (hasDoor){
+      // The bulkhead across the back of the entrance well.  The boarding code stops
+      // people dead here, so it sits exactly where the other single-deckers' does.
+      const bz = z + (DOOR_BACK - (BUS_Z - BUS_HW));
+      b.box(1.44, 0.98, 0.10, 0x2b3038, 1.50, 0.98, bz);
+      b.box(1.44, 0.08, 0.14, 0x3d434c, 1.50, 1.48, bz);
+      b.cyl(0.045,0.045,2.00,8, GOLD, 1.50, 1.52, bz-0.10);
+      b.box(0.42,0.34,0.16, 0x1f242c, 0.98, 1.30, bz-0.08);      // ticket machine
+      b.box(0.30,0.16,0.03, 0x2f7ac4, 0.98, 1.36, bz-0.17);
+      b.box(0.10, 2.32, 0.14, 0x141a24, 0.78, 1.64, z);
+      b.box(0.10, 2.32, 0.14, 0x141a24, 2.22, 1.64, z);
+      b.box(1.54, 0.14, 0.14, 0x141a24, 1.50, 2.86, z);
+      b.box(1.54, 0.10, 0.10, GOLD,     1.50, 0.54, z-0.02);     // yellow step edge
+    }
+  }
+  flank(-HW, true);
+  flank( HW, false);
+
+  // ---- three axles, the rear pair close together ----
+  // The arches are cut into the skirt and lipped, as they are on the other two.  A flat
+  // dark rectangle behind each wheel left the trailing pair reading as wheels stuck on
+  // rather than as a tandem, which is the one thing you are meant to count from the kerb.
+  for (const wx of SB_AXLE){
+    for (const sz of [1,-1]){
+      b.box(1.30, 0.62, 0.05, 0x171b22, wx, 0.66, sz*(HW+0.012));
+      for (let k=0;k<6;k++){
+        const a = Math.PI*(0.10 + k*0.16);
+        b.box(0.29, 0.08, 0.06, SKIRTC_D,
+              wx - Math.cos(a)*0.60, 0.52 + Math.sin(a)*0.60, sz*(HW+0.032), 0, 0, Math.PI/2 - a);
+      }
+    }
+    for (const wz of [-1.18, 1.18]){
+      b.cyl(0.52,0.52,0.30,14, 0x15171b, wx, 0.52, wz, Math.PI/2,0,0);
+      b.cyl(0.28,0.28,0.33,10, 0xa8adb4, wx, 0.52, wz, Math.PI/2,0,0);
+      b.cyl(0.10,0.10,0.36,8,  0x8b9098, wx, 0.52, wz, Math.PI/2,0,0);
+    }
+  }
+  b.box(9.4,0.28,2.2, 0x23272d, -1.0, 0.30, 0);
+  return b.build();
+}
+
+function makeBusNXS(){
+  const group = new THREE.Group();
+  const ext = new THREE.Mesh(buildNXSExterior(), VMAT());
+  ext.castShadow=true; ext.receiveShadow=true; group.add(ext);
+
+  // The saloon is the school buses' — same seats in the same order, because the
+  // boarding ladder and the ride camera are both measured off it.
+  const interior = buildBusInterior();
+  const intMesh = new THREE.Mesh(interior.geo, VMAT({side:THREE.DoubleSide}));
+  intMesh.receiveShadow=true; group.add(intMesh);
+
+  const {HL,HW,WIN0,WIN1,SKIRT_T} = NXS, F = NXSF, MW = HW*2;
+  const WY=(WIN0+WIN1)/2, WH=WIN1-WIN0, WAIST=(SKIRT_T+WIN0)/2;
+  function glass(w,h,x,y,z,ry,mat){
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h), mat||ddGlassMat);
+    m.position.set(x,y,z); m.rotation.y=ry||0; group.add(m); return m;
+  }
+  const segsDoor = [[-6.14,-4.72],[-4.60,-3.18],[-3.06,-1.64],[-1.52,-0.10],[0.02,0.72],
+                    [2.28,3.56],[3.68,4.90],[5.02,6.14]];
+  const segsOff  = segsDoor.concat([[0.84,2.16]]);
+  for (const r of segsDoor) glass(r[1]-r[0], WH, (r[0]+r[1])/2, WY, -HW-0.005, 0);
+  for (const r of segsOff)  glass(r[1]-r[0], WH, (r[0]+r[1])/2, WY,  HW+0.005, 0);
+  glass(MW-0.44, F.SCR1-F.SCR0-0.10, HL+0.09, (F.SCR0+F.SCR1)/2, 0, Math.PI/2, ddScreenMat);
+  glass(1.94, WH-0.10, -HL-0.09, WY, 0, Math.PI/2, ddScreenMat);
+
+  function decal(tex,w,h,x,y,z,ry){
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h), new THREE.MeshBasicMaterial({map:tex,transparent:true}));
+    m.position.set(x,y,z); m.rotation.y=ry||0; group.add(m); return m;
+  }
+  const TEX033 = TEX_ROUTE['033'];
+  // Front.  Texture +X maps to world -Z at this rotation, so the fleet number lands on
+  // the kerb side, as it does on the NX2.
+  const ledFront = decal(TEX033, 1.98, F.BLIND_H, HL+0.155, F.BLIND_Y, 0, Math.PI/2);
+  decal(TEX_NXS_FLEET, 0.96,0.15, HL+0.11, 1.58, -0.62, Math.PI/2);
+  decal(TEX_AT,        1.30,0.33, HL+0.11, 1.30,  0.00, Math.PI/2);
+  decal(TEX_NXS_PLATE, 0.74,0.25, HL+0.21, 0.52,  0.00, Math.PI/2);
+  // Sides: the wordmark in the navy under the glazing, fleet number small behind the door.
+  for (const sz of [1,-1]){
+    const zz = sz*(HW+0.055), ry = sz<0 ? Math.PI : 0;
+    decal(TEX_AT,        1.70,0.43, -3.55, WAIST, zz, ry);
+    decal(TEX_NXS_FLEET, 1.00,0.16,  3.20, WAIST, zz, ry);
+  }
+  decal(TEX_SIGNAL, 1.30,0.16, -0.20, WAIST, -HW-0.055, Math.PI);
+  const ledSide = decal(TEX033, 0.94,0.21, 0.36, 2.76, -HW-0.06, Math.PI);
+
+  // ---- doors: same two leaves in the same place as the other single-deckers ----
+  function leaf(dirX){
+    const p = new THREE.Group();
+    const bb = new Builder();
+    const w=0.70;
+    bb.box(w,2.14,0.07, 0x141a24, dirX*w/2, 1.66, 0);
+    bb.box(w,0.10,0.09, 0x141a24, dirX*w/2, 0.58, 0);
+    bb.box(0.07,2.14,0.09, 0x141a24, dirX*w, 1.66, 0);
+    bb.box(w*0.5,0.06,0.09, GOLD, dirX*w*0.5, 1.20, -0.03);
+    const m=new THREE.Mesh(bb.build(), VMAT()); m.castShadow=true;
+    p.add(m);
+    const gl=new THREE.Mesh(new THREE.PlaneGeometry(w*0.86,1.86), ddGlassMat);
+    gl.position.set(dirX*w/2, 1.70, 0.01); p.add(gl);
+    group.add(p);
+    return p;
+  }
+  const doorA = leaf( 1); doorA.position.set(0.78, 0, -BUS_HW-0.04);
+  const doorB = leaf(-1); doorB.position.set(2.22, 0, -BUS_HW-0.04);
+
+  const FIT = fitOutSingleDeck(group, interior);
+  const occupants = FIT.occupants, BASE_LOAD = FIT.baseLoad;
+  const RIDE_X = FIT.RIDE_X, RIDE_Z = FIT.RIDE_Z;
+  // the glass is the NX2's, which is nearly black, so the saloon needs the light
+  for (const lx of [3.4, 0.2, -3.2]){
+    const pl = new THREE.PointLight(0xfff1d8, 0.66, 7.5, 2);
+    pl.position.set(lx, 2.80, 0); group.add(pl);
+  }
+  const driver = new THREE.Mesh(buildDriver(), studentMat);
+  driver.position.set(4.62, 1.60, 0.72); driver.rotation.y = -Math.PI/2;
+  group.add(driver);
+
+  scene.add(group);
+  return {
+    group, doorA, doorB, occupants, doorT:0,
+    setDoor(t){
+      this.doorT=t;
+      const a = t*1.75;
+      doorA.rotation.y =  a;
+      doorB.rotation.y = -a;
+    },
+    capacity: occupants.length,
+    isDouble: false, seatCount: 20, baseLoad: BASE_LOAD,   // one deck, so no top-deck bonus
+    ridePos: { x: RIDE_X, y: 1.02 + 1.52, z: RIDE_Z },
+    frontSeats: [],
+    fill(n){ for (let i=0;i<this.occupants.length;i++){
+      const o=this.occupants[i]; o.visible = (i<n) && !o.userData.taken; } },
+    setBoarded(n){ this.fill(this.baseLoad + n); },
+    setLoad(){ this.fill(this.baseLoad); },
+    releaseSeats(){ for (const o of this.occupants) o.userData.taken=false; },
+    setFront(){}, clearFront(){},
+    route: SCHOOL_ROUTES[0],
+    setRoute(r){
+      this.route = r;
+      const tex = TEX_ROUTE[r.n] || TEX033;
+      ledFront.material.map = tex; ledFront.material.needsUpdate = true;
+      ledSide.material.map  = tex; ledSide.material.needsUpdate  = true;
+    }
+  };
+}
+
+
+/* ============================================================
    5b-ii.  THE 871  —  AT's battery-electric single-decker
    ============================================================ */
 /* Two-tone: silver-grey below the waist, near-black navy above the glass, with a
@@ -2081,7 +2567,7 @@ const EVG = {
 };
 /* front elevation, bottom up: silver bumper, navy panel, screen aperture, navy brow */
 const EVF = { B0:0.24, B1:1.14, P1:1.70, S1:3.06, BLIND_Y:2.74, BLIND_H:0.46 };
-const EV_LAMP_Y = 1.33;      // lamp centre — sat in the navy, just clear of the bumper
+const EV_LAMP_Y = 0.82;      // lamp centre — mid-silver, well under the split, as the Geely wears them
 
 /* The waistline band: a chevron repeat rather than a real koru, because at the size
    it renders here anything finer turns to mush.  Takes the run in metres so the flank
@@ -2243,12 +2729,12 @@ function buildEVExterior(){
     b.box(0.50, c[1]-c[0], 0.11, c[2], FX-0.20, (c[0]+c[1])/2, sz*(HW-0.14), 0, sz*0.70, 0);
   // the blind box stands proud of the screen so the gaps between its dots stay black
   b.box(0.07, F.BLIND_H+0.06, 2.24, 0x05060a, FX+0.10, F.BLIND_Y, 0);
-  // Headlamps are a decal on the badge panel — see evLampTexture.  Under each of them,
-  // out at the corner, the real bus carries a small separate lamp sunk into the silver;
-  // it is what stops the bumper reading as one blank slab.
+  // Headlamps are a decal — see evLampTexture.  Under each of them, out at the corner,
+  // the real bus carries a small separate lamp sunk into the silver; it is what stops
+  // the bumper reading as one blank slab.  It follows the clusters down.
   for (const sz of [1,-1]){
-    b.box(0.02, 0.12, 0.24, 0x555c68, FX+0.145, 0.86, sz*0.85);
-    b.box(0.02, 0.05, 0.15, 0xcfd8e6, FX+0.152, 0.86, sz*0.85);
+    b.box(0.02, 0.12, 0.24, 0x555c68, FX+0.145, 0.46, sz*0.85);
+    b.box(0.02, 0.05, 0.15, 0xcfd8e6, FX+0.152, 0.46, sz*0.85);
   }
   // wipers parked low across the screen
   for (const sz of [1,-1]){
@@ -2349,12 +2835,14 @@ function makeBusElectric(){
   // Front.  Texture +X maps to world -Z at this rotation, so the fleet number lands on
   // the kerb side of the front, where it is on the real bus.
   const ledFront = decal(TEX871, 2.14, F.BLIND_H, HL+0.145, F.BLIND_Y, 0, Math.PI/2);
-  // the plane covers the whole badge panel but the clusters sit low in the texture,
-  // so it has to ride above EV_LAMP_Y for them to land on it
-  decal(TEX_EV_LAMPS,  2.08,0.52, HL+0.105, EV_LAMP_Y+0.083, 0.00, Math.PI/2);
+  // the plane covers the whole badge panel but the clusters sit low in the texture, so
+  // it rides above EV_LAMP_Y for them to land on it — and proud of the bumper, which
+  // stands 6 cm out from the panel and would otherwise swallow the lot
+  decal(TEX_EV_LAMPS,  2.08,0.52, HL+0.18, EV_LAMP_Y+0.083, 0.00, Math.PI/2);
   decal(TEX_EV_FLEETF, 0.86,0.14, HL+0.11, 1.60, -0.74, Math.PI/2);
-  decal(TEX_EV_ROUND,  0.34,0.34, HL+0.11, EV_LAMP_Y, 0.00, Math.PI/2);
-  decal(TEX_EV_PLATE,  0.70,0.23, HL+0.16, 0.58,  0.00, Math.PI/2);
+  // the roundel stays up on the navy — white on silver would vanish
+  decal(TEX_EV_ROUND,  0.34,0.34, HL+0.11, 1.26, 0.00, Math.PI/2);
+  decal(TEX_EV_PLATE,  0.70,0.23, HL+0.16, 0.48,  0.00, Math.PI/2);   // down with the corner lamps
   // Sides: the band runs the length of the flank, the roundel sits on the rear panel.
   for (const sz of [1,-1]){
     const zz = sz*(HW+0.055), ry = sz<0 ? Math.PI : 0;
@@ -2418,6 +2906,412 @@ function makeBusElectric(){
     setRoute(r){
       this.route = r;
       const tex = TEX_ROUTE[r.n] || TEX871;
+      ledFront.material.map = tex; ledFront.material.needsUpdate = true;
+      ledSide.material.map  = tex; ledSide.material.needsUpdate  = true;
+    }
+  };
+}
+
+
+/* ============================================================
+   5b-iii.  THE 449 / 034  —  the silver-cab body  (NB2147)
+   ============================================================ */
+/* A third coachbuilder again, and the one bus in the bay you can name from the far
+   end of it.  The cab is a bolt-on module in bare silver — nose, screen surround and
+   the front metre and a half of flank — and it stops dead at a seam, so the bus looks
+   like two vehicles spliced.  Behind the seam the body is navy over WHITE, not navy
+   over silver, and the two are split by a beltline that lifts through the last third
+   and dies into that seam.  The AT Metro mark and its trail of circuit lines ride the
+   glass at the back.  None of that is the 033, which is the point of having both.
+   Same length, same doorway, same saloon and the same ride position as the other
+   single-deckers, so it boards exactly as they do. */
+const NB_NAVY   = 0x1b2b52,   // the waist band and the panel under the screen
+      NB_BLUE   = 0x46608f,   // the body above the glazing
+      NB_BLUE_T = 0x6d86b4,   // and the lighter roll into the roof
+      NB_WHT    = 0xdfe4ea,   // the lower body — white, not silver, and that is the tell
+      NB_WHT_D  = 0xc4cad2,
+      NB_SIL    = 0xb3bac4,   // the cab module, and it wants to be greyer than the white
+      NB_SIL_D  = 0x8d949e,
+      NB_BLK    = 0x0a0d13;
+
+const NBG = {
+  HL: BUS_HL, HW: BUS_HW,
+  BODY_B: 0.28,                 // bottom of the painted body; black valance below it
+  WIN0: 1.60, WIN1: 2.88,       // deep square bays — deeper than either of the other two
+  ROOF: 3.28,
+  CAB0: 4.62                    // where the silver module takes the flank over
+};
+/* front elevation, bottom up: valance, silver nose, navy panel, screen, silver brow */
+const NBF = { V0:0.14, B0:0.34, B1:1.12, P1:1.78, S1:3.04, BLIND_Y:2.74, BLIND_H:0.42 };
+/* Long front overhang — the front wheel sits well back of the cab seam, as it does on
+   the real thing — and the rear pair close up behind it. */
+const NB_AXLE = [3.40, -2.92, -4.30];
+const NB_PIL  = [-6.20,-4.78,-3.36,-1.94,-0.52,0.78,2.22,3.55,4.62];
+const NB_CABT = NBG.CAB0 - 0.34;   // the seam leans back as it climbs
+
+/* The beltline.  Flat down the back, then it lifts through the last third and runs out
+   to a point against the cab seam.  It is the one line that stops this reading as the
+   033 from across the bay, so it is worth the columns it costs to draw. */
+function nbWaist(x){
+  const t = clamp((x - 0.30) / (NBG.CAB0 - 0.30), 0, 1);
+  return 1.24 + 0.30 * t*t*(3-2*t);
+}
+
+/* The mark and the trail go on as two decals rather than one.  The mark carries text,
+   so it has to be mirrored side to side to stay readable and lands wherever that puts
+   it; the trail is only lines, so it can be placed by the metre on both flanks. */
+function nbMarkTexture(){
+  const W=512, H=256;
+  const c=document.createElement('canvas'); c.width=W; c.height=H;
+  const g=c.getContext('2d');
+  g.clearRect(0,0,W,H);
+  // the roundel — AT's own three colours round the rim, not the plain white outline
+  const CX=76, CY=128, R=66;
+  g.beginPath(); g.arc(CX,CY,R,0,6.2832); g.fillStyle='#ffffff'; g.fill();
+  const RIM=[['#1c62b4',-2.30,0.42],['#d0342c',0.42,2.30],['#5aa832',2.30,3.98]];
+  g.lineWidth=15; g.lineCap='butt';
+  for (const r of RIM){ g.beginPath(); g.arc(CX,CY,R-8,r[1],r[2]); g.strokeStyle=r[0]; g.stroke(); }
+  g.fillStyle='#1e2c4c'; g.textAlign='center'; g.textBaseline='middle';
+  g.font='900 70px "Segoe UI",Arial,sans-serif';
+  g.fillText('AT', CX, CY+3);
+  g.save(); g.translate(CX,CY+3); g.rotate(-0.40);       // the stroke that cuts the A from the T
+  g.fillStyle='#ffffff'; g.fillRect(-3,-37,6,74); g.restore();
+  g.fillStyle='#ffffff'; g.textAlign='left';
+  g.font='600 132px "Segoe UI",Arial,sans-serif';
+  g.fillText('Metro', CX+R+16, CY+10);
+  const t=new THREE.CanvasTexture(c); t.anisotropy=8; return t;
+}
+/* Five lines out of the rear corner, elbowed forward and stepped off one after another.
+   Nested radii, or the bundle crosses itself.  Shallow, because it has to live inside a
+   waist band that is a third of a metre deep at its deepest. */
+function nbTrailTexture(){
+  const W=1024, H=128;
+  const c=document.createElement('canvas'); c.width=W; c.height=H;
+  const g=c.getContext('2d');
+  g.clearRect(0,0,W,H);
+  g.strokeStyle='#ffffff'; g.lineCap='round'; g.lineJoin='round'; g.lineWidth=8;
+  const CX0=150;
+  for (let i=0;i<5;i++){
+    const y=34+i*17, r=20+i*18, xE=470+i*118;
+    g.beginPath();
+    g.moveTo(CX0-r, H+8);
+    g.lineTo(CX0-r, y+r);
+    g.arcTo(CX0-r, y, CX0, y, r);
+    g.lineTo(xE, y);
+    g.stroke();
+  }
+  g.lineWidth=4;                                  // the little nodes that ride over the bundle
+  for (let i=0;i<3;i++){
+    const x=336+i*58;
+    g.beginPath(); g.moveTo(x, 20); g.lineTo(x, 34); g.stroke();
+    g.beginPath(); g.arc(x, 13, 8, 0, 6.2832); g.stroke();
+  }
+  const t=new THREE.CanvasTexture(c); t.anisotropy=8; return t;
+}
+const TEX_NB_MARK   = nbMarkTexture();
+const TEX_NB_TRAIL  = nbTrailTexture();
+/* The trail has no lettering in it, so the kerb side can simply run it backwards and
+   keep its elbow at the rear corner where it belongs.  The mark cannot: mirror that
+   and it reads orteM. */
+const TEX_NB_TRAIL_R = TEX_NB_TRAIL.clone();
+TEX_NB_TRAIL_R.wrapS = THREE.ClampToEdgeWrapping;
+TEX_NB_TRAIL_R.repeat.x = -1; TEX_NB_TRAIL_R.offset.x = 1;
+TEX_NB_TRAIL_R.needsUpdate = true;
+const TEX_NB_FLEET  = wordTexture('NB2147', 104, '#eef2f7');
+const TEX_NB_PLATE  = plateTexture('EQG692', '#f2f2ee', '#15181d', false);
+/* The board on this one is the newer lime, not the amber the other two carry. */
+const TEX_NB_SCHOOL = plateTexture('SCHOOL', '#cbee1e', '#0a0c06', true);
+/* A shade lighter than the 033's near-black: you have to see the crush through it. */
+const nbGlassMat  = new THREE.MeshLambertMaterial({color:0x0c1119, transparent:true, opacity:0.60,
+                                                   side:THREE.DoubleSide, depthWrite:false});
+const nbScreenMat = new THREE.MeshLambertMaterial({color:0x1a2331, transparent:true, opacity:0.34,
+                                                   side:THREE.DoubleSide, depthWrite:false});
+
+function buildNBExterior(){
+  const b=new Builder();
+  const {HL,HW,BODY_B,WIN0,WIN1,ROOF,CAB0} = NBG;
+  const F=NBF, MW=HW*2, FX=HL, BLK=NB_BLK, IN=0.22;
+
+  // ---- roof: pale cap, with the aircon pod up behind the cab where you can see it ----
+  b.box(HL*2, 0.10, MW, 0xdadfe5, 0, ROOF+0.05, 0);
+  b.box(4.40, 0.26, MW*0.60, 0x24365e, 1.20, ROOF+0.18, 0);        // and it is navy, not grey
+  b.box(2.30, 0.09, MW*0.42, 0x9aa2ac, -3.50, ROOF+0.13, 0);
+  b.box(0.46, 0.12, MW-0.14, 0xdadfe5, FX-0.22, ROOF-0.01, 0, 0,0,-0.44);   // roll into the screen
+
+  // ---- rear ----
+  b.box(0.12, ROOF-WIN1,      MW, NB_BLUE, -HL, (WIN1+ROOF)/2, 0);
+  b.box(0.12, WIN1-WIN0,      MW, NB_NAVY, -HL, (WIN0+WIN1)/2, 0);
+  b.box(0.10, WIN1-WIN0-0.24, 2.00, BLK,   -HL-0.03, (WIN0+WIN1)/2, 0);   // the back window, framed
+  b.box(0.12, WIN0-1.24,      MW, NB_NAVY, -HL, (1.24+WIN0)/2, 0);
+  b.box(0.12, 1.24-BODY_B,    MW, NB_WHT,  -HL, (BODY_B+1.24)/2, 0);
+  b.box(0.13, BODY_B-F.V0,    MW, 0x14171d,-HL, (F.V0+BODY_B)/2, 0);
+  for (const sz of [1,-1]){
+    b.box(0.10, 0.40, 0.24, 0x8b1f24, -HL-0.05, 1.52, sz*0.90);
+    b.box(0.10, 0.13, 0.24, 0xd8a238, -HL-0.05, 1.26, sz*0.90);
+  }
+  // the rear corners are properly rounded on this body, so they get the same treatment
+  // as the nose rather than meeting the flank at a right angle
+  const RCORN = [[F.V0,BODY_B,0x14171d],[BODY_B,1.24,NB_WHT],[1.24,WIN0,NB_NAVY],
+                 [WIN0,WIN1,BLK],[WIN1,ROOF,NB_BLUE]];
+  for (const sz of [1,-1]) for (const c of RCORN)
+    b.box(0.46, c[1]-c[0], 0.11, c[2], -HL+0.18, (c[0]+c[1])/2, sz*(HW-0.13), 0, -sz*0.70, 0);
+
+  // ---- front: a silver module with a navy panel slung under a very big screen ----
+  b.box(0.26, F.B0-F.V0, MW-2*IN+0.14, 0x14171d, FX+0.03, (F.V0+F.B0)/2, 0);     // valance
+  b.box(0.32, F.P1-F.B0, MW-2*IN+0.10, NB_SIL,   FX+0.03, (F.B0+F.P1)/2, 0);     // the nose, all one piece
+  b.box(0.08, 0.34, 0.90, 0x6f7680, FX+0.195, 0.60, 0);                          // plate recess
+  // The navy panel goes on over the silver and narrows as it falls, so its ends sweep
+  // up and out of sight instead of meeting the corner square.  That shape is most of
+  // what you recognise the front of this bus by.
+  b.box(0.07, 0.30, MW-2*IN+0.02, NB_NAVY, FX+0.185, F.P1-0.15, 0);
+  b.box(0.07, 0.27, MW-2*IN-0.30, NB_NAVY, FX+0.185, F.P1-0.43, 0);
+  b.box(0.07, 0.19, MW-2*IN-0.76, NB_NAVY, FX+0.185, F.P1-0.65, 0);
+  for (const sz of [1,-1]) b.box(0.07, 0.24, 0.54, NB_NAVY, FX+0.185, F.P1+0.10, sz*0.96);
+  // The screen stays an open aperture in a black surround.  Fill it and you lose the
+  // driver and the front of the saloon, which is half of why any of these read at all.
+  b.box(0.18, 0.09, MW-2*IN+0.02, BLK, FX+0.06, F.P1-0.045, 0);
+  b.box(0.18, 0.12, MW-2*IN,      BLK, FX+0.05, F.S1-0.06,  0);
+  for (const sz of [1,-1])
+    b.box(0.18, F.S1-F.P1, 0.22, BLK, FX+0.05, (F.P1+F.S1)/2, sz*(MW/2-IN-0.05));
+  // and its corners are big radii, not corners — four diagonal fillets
+  for (const sz of [1,-1]) for (const sy of [1,-1])
+    b.box(0.18, 0.40, 0.13, BLK, FX+0.05,
+          sy>0 ? F.S1-0.20 : F.P1+0.20, sz*(MW/2-IN-0.17), sz*sy*0.80);
+  b.box(0.20, (ROOF+0.04)-F.S1, MW, NB_SIL, FX+0.04, ((ROOF+0.04)+F.S1)/2, 0);   // brow
+  b.box(0.10, (ROOF+0.04)-F.S1, MW-0.10, 0x161c26, FX-0.06, ((ROOF+0.04)+F.S1)/2, 0);
+  // the blind lives behind the screen on this body, not in a box hung off the front
+  b.box(0.05, F.BLIND_H+0.05, 1.72, 0x05060a, FX-0.055, F.BLIND_Y, 0);
+  // The nose is rounded hard: a slanted panel tucks each corner back into the flank.
+  // Silver takes the corner at every level bar the valance — the navy stops short.
+  const CORN = [[F.V0,F.B0,0x14171d], [F.B0,F.P1,NB_SIL],
+                [F.P1,F.S1,NB_SIL],   [F.S1,ROOF+0.04,NB_SIL]];
+  for (const sz of [1,-1]) for (const c of CORN){
+    b.box(0.34, c[1]-c[0], 0.12, c[2], FX-0.30, (c[0]+c[1])/2, sz*(HW-0.11), 0, sz*0.46, 0);
+    b.box(0.36, c[1]-c[0], 0.12, c[2], FX+0.02, (c[0]+c[1])/2, sz*(HW-0.20), 0, sz*1.02, 0);
+  }
+  // Lamps: small round ones, two a side, set diagonally low in the silver.  Nothing
+  // like the Enviro's stacked triple or the Geely's wedge, and that is the whole point.
+  for (const sz of [1,-1]){
+    b.cyl(0.105,0.105,0.08,12, 0x14181f, FX+0.175, 0.90, sz*1.04, 0,0,Math.PI/2);
+    b.cyl(0.072,0.072,0.10,12, 0xf1f5fc, FX+0.195, 0.90, sz*1.04, 0,0,Math.PI/2);
+    b.cyl(0.086,0.086,0.08,12, 0x14181f, FX+0.175, 0.62, sz*0.84, 0,0,Math.PI/2);
+    b.cyl(0.058,0.058,0.10,12, 0xffe6bb, FX+0.195, 0.62, sz*0.84, 0,0,Math.PI/2);
+  }
+  // wipers parked low across the screen
+  for (const sz of [1,-1]){
+    b.box(0.04,0.04,0.92, 0x15171b, FX+0.10, 2.00, sz*0.52, 0.70);
+    b.box(0.05,0.15,0.06, 0x15171b, FX+0.10, 1.86, sz*0.52);
+  }
+  // mirrors on stalks off the cab shoulders
+  for (const sz of [1,-1]){
+    b.cyl(0.035,0.035,0.60,6, 0x1b1e24, FX-0.20, 2.94, sz*(HW+0.20), 0,0,-sz*0.30);
+    b.box(0.09,0.56,0.24, 0x1b1e24, FX-0.36, 2.62, sz*(HW+0.36));
+    b.box(0.03,0.46,0.18, 0x3a4049, FX-0.42, 2.62, sz*(HW+0.36));
+  }
+
+  // ---- flanks ----
+  function flank(z, hasDoor){
+    // white below the beltline as one panel; the navy over it goes on in columns,
+    // because its lower edge is a curve and boxes do not do curves any other way
+    const segs = hasDoor ? [[-HL, 0.78],[2.22, CAB0]] : [[-HL, CAB0]];
+    for (const s of segs){
+      const w=s[1]-s[0], cx=(s[0]+s[1])/2;
+      b.box(w, BODY_B-F.V0, 0.08, 0x14171d, cx, (F.V0+BODY_B)/2, z);
+      b.box(w, WIN0-BODY_B, 0.09, NB_WHT,   cx, (BODY_B+WIN0)/2, z);
+      b.box(w, 0.16, 0.095, NB_WHT_D,       cx, BODY_B+0.08, z);      // the skirt sits in shadow
+    }
+    const N=44, X0=-HL, dx=(CAB0-X0)/N;
+    for (let i=0;i<N;i++){
+      const cx = X0 + (i+0.5)*dx;
+      if (hasDoor && cx>0.78 && cx<2.22) continue;
+      const y0 = nbWaist(cx);
+      // and it runs out to a point where it meets the cab seam
+      const top = cx > CAB0-1.20 ? lerp(WIN0, y0+0.015, (cx-(CAB0-1.20))/1.20) : WIN0;
+      if (top-y0 < 0.025) continue;
+      b.box(dx+0.014, top-y0, 0.11, NB_NAVY, cx, (y0+top)/2, z);
+    }
+    // above the glazing, and the lighter roll at the roof line
+    const wb = NB_CABT + HL;
+    b.box(wb, ROOF-WIN1, 0.09, NB_BLUE,   (NB_CABT-HL)/2, (WIN1+ROOF)/2, z);
+    b.box(wb, 0.11, 0.10, NB_BLUE_T,      (NB_CABT-HL)/2, ROOF-0.055, z);
+    // Rubbers top and bottom and a black post between every bay.  The glass then goes
+    // on a centimetre proud of them, which is what makes the bays read as separate
+    // squares rather than as the one unbroken ribbon the other two wear.
+    const gw = CAB0+HL, gcx = (CAB0-HL)/2;
+    b.box(gw, 0.06, 0.10, BLK, gcx, WIN0+0.03, z);
+    b.box(gw, 0.06, 0.10, BLK, gcx, WIN1-0.03, z);
+    for (const px of NB_PIL) b.box(0.115, WIN1-WIN0, 0.095, BLK, px, (WIN0+WIN1)/2, z);
+    // ---- the silver cab module, with the driver's window let into it ----
+    const d0=CAB0+0.14, d1=HL-0.50, DY0=1.94, DY1=2.82;
+    b.box(HL-CAB0, DY0-BODY_B, 0.10, NB_SIL, (CAB0+HL)/2, (BODY_B+DY0)/2, z);
+    b.box(HL-CAB0, ROOF-DY1,   0.10, NB_SIL, (CAB0+HL)/2, (DY1+ROOF)/2,   z);
+    b.box(d0-CAB0, DY1-DY0,    0.10, NB_SIL, (CAB0+d0)/2, (DY0+DY1)/2,    z);
+    b.box(HL-d1,   DY1-DY0,    0.10, NB_SIL, (d1+HL)/2,   (DY0+DY1)/2,    z);
+    b.box(0.34, ROOF-2.20, 0.10, NB_SIL, NB_CABT+0.17, (2.20+ROOF)/2, z);
+    b.box(0.04, ROOF-BODY_B, 0.098, NB_SIL_D, CAB0, (BODY_B+ROOF)/2, z);      // the seam itself
+    b.box(0.03, DY0-BODY_B-0.10, 0.102, NB_SIL_D, d1, (BODY_B+DY0)/2, z);      // driver's door shut-line
+    b.box(0.03, DY0-BODY_B-0.10, 0.102, NB_SIL_D, d0-0.02, (BODY_B+DY0)/2, z);
+    for (const y of [DY0+0.03, DY1-0.03]) b.box(d1-d0, 0.05, 0.105, BLK, (d0+d1)/2, y, z);
+    if (hasDoor){
+      // The bulkhead across the back of the entrance well.  The boarding code stops
+      // people dead here, so it sits exactly where the other single-deckers' does.
+      const bz = z + (DOOR_BACK - (BUS_Z - BUS_HW));       // door well depth, in bus-local Z
+      b.box(1.44, 0.98, 0.10, 0x2b3038, 1.50, 0.98, bz);
+      b.box(1.44, 0.08, 0.14, 0x3d434c, 1.50, 1.48, bz);
+      b.cyl(0.045,0.045,2.00,8, 0xd8b12a, 1.50, 1.52, bz-0.10);
+      b.box(0.42,0.34,0.16, 0x1f242c, 0.98, 1.30, bz-0.08);   // the ticket machine
+      b.box(0.30,0.16,0.03, 0x2f7ac4, 0.98, 1.36, bz-0.17);
+      b.box(0.10, 2.44, 0.14, BLK, 0.78, 1.68, z);
+      b.box(0.10, 2.44, 0.14, BLK, 2.22, 1.68, z);
+      b.box(1.54, 0.14, 0.14, BLK, 1.50, 2.90, z);
+      b.box(1.54, 0.10, 0.10, 0xd8b12a, 1.50, 0.56, z-0.02);  // yellow step edge
+      b.box(0.22, 0.28, 0.04, 0xd8b12a, 2.22, 2.34, z-0.06);
+      b.cyl(0.04,0.04,1.90,8, 0xd8b12a, 0.90, 1.56, z+0.16);
+      b.cyl(0.04,0.04,1.90,8, 0xd8b12a, 2.10, 1.56, z+0.16);
+    }
+  }
+  flank(-HW, true);
+  flank( HW, false);
+
+  // ---- three axles, rear pair close up, and not all on the same wheels ----
+  for (let i=0;i<NB_AXLE.length;i++){
+    const wx = NB_AXLE[i], polished = (i !== 2);   // the trailing axle runs plain steel
+    for (const sz of [1,-1]){
+      b.box(1.30, 0.72, 0.05, 0x0e1117, wx, 0.70, sz*(HW+0.012));      // the liner, cut into the white
+      for (let k=0;k<8;k++){                                           // and its edge, stepped round
+        const a = Math.PI*(0.045 + k*0.130);
+        b.box(0.25, 0.045, 0.05, 0x9aa1aa,
+              wx - Math.cos(a)*0.64, 0.50 + Math.sin(a)*0.64, sz*(HW+0.030), 0, 0, Math.PI/2 - a);
+      }
+    }
+    for (const wz of [-1.18, 1.18]){
+      b.cyl(0.52,0.52,0.30,14, 0x15171b, wx, 0.52, wz, Math.PI/2,0,0);
+      b.cyl(0.30,0.30,0.33,10, polished?0xd2d7dd:0x9298a0, wx, 0.52, wz, Math.PI/2,0,0);
+      b.cyl(0.12,0.12,0.36,8,  polished?0xeef1f5:0x7d838b, wx, 0.52, wz, Math.PI/2,0,0);
+      if (polished) for (let k=0;k<8;k++){                             // yellow lug caps, as they wear them
+        const a = k*Math.PI/4;
+        b.cyl(0.028,0.028,0.37,6, 0xe0b52a, wx+Math.cos(a)*0.20, 0.52+Math.sin(a)*0.20, wz, Math.PI/2,0,0);
+      }
+    }
+  }
+  b.box(9.4,0.28,2.2, 0x23272d, -1.0, 0.30, 0);  // chassis
+  return b.build();
+}
+
+function makeBusNB(){
+  const group = new THREE.Group();
+  const ext = new THREE.Mesh(buildNBExterior(), VMAT());
+  ext.castShadow=true; ext.receiveShadow=true; group.add(ext);
+
+  // The saloon is the school buses' — same seats in the same order, because the
+  // boarding ladder and the ride camera are both measured off it.
+  const interior = buildBusInterior();
+  const intMesh = new THREE.Mesh(interior.geo, VMAT({side:THREE.DoubleSide}));
+  intMesh.receiveShadow=true; group.add(intMesh);
+
+  const {HL,HW,WIN0,WIN1,CAB0} = NBG, F = NBF, MW = HW*2;
+  const WY=(WIN0+WIN1)/2, WH=WIN1-WIN0;
+  function glass(w,h,x,y,z,ry,mat){
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h), mat||nbGlassMat);
+    m.position.set(x,y,z); m.rotation.y=ry||0; group.add(m); return m;
+  }
+  // the bays between the posts; the doorway is the one gap on the kerb side.  The panes
+  // stand a centimetre outside the posts, as they do on the real body.
+  const segsDoor = [[-6.14,-4.84],[-4.72,-3.42],[-3.30,-2.00],[-1.88,-0.58],[-0.46,0.72],
+                    [2.28,3.49],[3.61,4.56]];
+  const segsOff  = segsDoor.concat([[0.84,2.16]]);
+  for (const r of segsDoor) glass(r[1]-r[0], WH-0.06, (r[0]+r[1])/2, WY, -HW-0.058, 0);
+  for (const r of segsOff)  glass(r[1]-r[0], WH-0.06, (r[0]+r[1])/2, WY,  HW+0.058, 0);
+  for (const sz of [1,-1])                                    // the driver's window, up in the silver
+    glass(HL-0.50-(CAB0+0.14), 0.82, (CAB0+0.14+HL-0.50)/2, 2.38, sz*(HW+0.056), sz<0?Math.PI:0);
+  (function(){                                   // one big screen, raked, corner to corner
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(2.04, 1.24), nbScreenMat);
+    m.rotation.order = 'YXZ';
+    m.rotation.set(-0.26, Math.PI/2, 0);
+    m.position.set(HL + 0.075, (F.P1+F.S1)/2, 0);
+    group.add(m);
+  })();
+  glass(1.96, WH-0.08, -HL-0.09, WY, 0, Math.PI/2, nbScreenMat);
+
+  function decal(tex,w,h,x,y,z,ry,rx){
+    const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h), new THREE.MeshBasicMaterial({map:tex,transparent:true}));
+    m.position.set(x,y,z); m.rotation.set(rx||0, ry||0, 0); group.add(m); return m;
+  }
+  const TEX449 = TEX_ROUTE['449'];
+  // Front.  Texture +X maps to world -Z at this rotation, so the fleet number lands on
+  // the offside and the board to the nearside of centre, where the photograph has them.
+  // The blind sits behind the screen glass, which is where this body carries it.
+  const ledFront = decal(TEX449, 1.66, F.BLIND_H, HL-0.02, F.BLIND_Y, 0, Math.PI/2);
+  decal(TEX_NB_FLEET,  0.78,0.122, HL+0.235, 1.36,  0.55, Math.PI/2);
+  decal(TEX_NB_SCHOOL, 0.90,0.28,  HL+0.235, 1.34, -0.24, Math.PI/2);
+  decal(TEX_NB_PLATE,  0.58,0.18,  HL+0.265, 0.60,  0.00, Math.PI/2);
+  // Sides: the mark rides the glass at the back with its circuit trail running forward
+  // along the waist, and the fleet number sits in the navy ahead of the front arch.
+  for (const sz of [1,-1]){
+    const zz = sz*(HW+0.075), ry = sz<0 ? Math.PI : 0;
+    decal(TEX_NB_MARK,  1.56,0.78,  -5.10, 1.96, zz, ry);   // rides the window line at the back
+    decal(sz>0?TEX_NB_TRAIL:TEX_NB_TRAIL_R, 3.30,0.41, -3.90, 1.40, zz, ry);   // trailing forward along the waist
+    decal(TEX_NB_FLEET, 0.88,0.138, -1.55, 1.42, zz, ry);
+  }
+  decal(TEX_SIGNAL, 1.30,0.16, -0.20, 1.42, -HW-0.075, Math.PI);
+  decal(TEX_EV_ROUND,  0.52,0.52, -HL-0.10, 1.42,  0.58, -Math.PI/2);
+  decal(TEX_NB_SCHOOL, 1.02,0.32, -HL-0.10, 0.86,  0.00, -Math.PI/2);
+  decal(TEX_NB_PLATE,  0.68,0.21, -HL-0.12, 0.52, -0.72, -Math.PI/2);
+  const ledSide = decal(TEX449, 0.94,0.21, 0.36, 2.62, -HW-0.075, Math.PI);
+
+  // ---- doors: the same two leaves in the same place as the other single-deckers ----
+  function leaf(dirX){
+    const p = new THREE.Group();
+    const bb = new Builder();
+    const w=0.70;
+    bb.box(w,2.24,0.07, 0x14171e, dirX*w/2, 1.70, 0);
+    bb.box(w,0.10,0.09, 0x14171e, dirX*w/2, 0.60, 0);
+    bb.box(0.07,2.24,0.09, 0x14171e, dirX*w, 1.70, 0);
+    bb.box(w*0.5,0.06,0.09, 0xd8b12a, dirX*w*0.5, 1.20, -0.03);
+    const m=new THREE.Mesh(bb.build(), VMAT()); m.castShadow=true;
+    p.add(m);
+    const gl=new THREE.Mesh(new THREE.PlaneGeometry(w*0.86,1.92), nbGlassMat);
+    gl.position.set(dirX*w/2, 1.72, 0.01); p.add(gl);
+    group.add(p);
+    return p;
+  }
+  const doorA = leaf( 1); doorA.position.set(0.78, 0, -BUS_HW-0.04);
+  const doorB = leaf(-1); doorB.position.set(2.22, 0, -BUS_HW-0.04);
+
+  const FIT = fitOutSingleDeck(group, interior);
+  const occupants = FIT.occupants, BASE_LOAD = FIT.baseLoad;
+  const RIDE_X = FIT.RIDE_X, RIDE_Z = FIT.RIDE_Z;
+  for (const lx of [3.4, 0.2, -3.2]){
+    const pl = new THREE.PointLight(0xfff1d8, 0.62, 7.5, 2);
+    pl.position.set(lx, 2.80, 0); group.add(pl);
+  }
+  const driver = new THREE.Mesh(buildDriver(), studentMat);
+  driver.position.set(4.62, 1.60, 0.72); driver.rotation.y = -Math.PI/2;
+  group.add(driver);
+
+  scene.add(group);
+  return {
+    group, doorA, doorB, occupants, doorT:0,
+    setDoor(t){
+      this.doorT=t;
+      const a = t*1.75;
+      doorA.rotation.y =  a;
+      doorB.rotation.y = -a;
+    },
+    capacity: occupants.length,
+    isDouble: false, seatCount: 20, baseLoad: BASE_LOAD,   // one deck, so no top-deck bonus
+    ridePos: { x: RIDE_X, y: 1.02 + 1.52, z: RIDE_Z },
+    frontSeats: [],
+    fill(n){ for (let i=0;i<this.occupants.length;i++){
+      const o=this.occupants[i]; o.visible = (i<n) && !o.userData.taken; } },
+    setBoarded(n){ this.fill(this.baseLoad + n); },
+    setLoad(){ this.fill(this.baseLoad); },
+    releaseSeats(){ for (const o of this.occupants) o.userData.taken=false; },
+    setFront(){}, clearFront(){},
+    route: SCHOOL_ROUTES[2],
+    setRoute(r){
+      this.route = r;
+      const tex = TEX_ROUTE[r.n] || TEX449;
       ledFront.material.map = tex; ledFront.material.needsUpdate = true;
       ledSide.material.map  = tex; ledSide.material.needsUpdate  = true;
     }
@@ -6408,12 +7302,24 @@ function finishExam(){
   });
 }
 
-const buses = [makeBus(), makeBus()];
+// One vehicle per body, not one per route: the school runs are spread across three
+// different buses so the bay does not look like the same bus turning up all afternoon.
+const busModern = makeBus();       // the low-floor rebuild
+const busOld    = makeBusOld();    // the body it replaced, still working the 049
+const busNXS    = makeBusNXS();    // the NX2 shell in school silver
+const busNB     = makeBusNB();     // the silver-cab body, navy over white
+const buses = [busModern, busOld, busNXS, busNB];
 const dblBus = makeBusDouble();
 const elecBus = makeBusElectric();
-const fleet = [buses[0], buses[1], dblBus, elecBus];
-buses[0].group.position.set(-95, 0, BUS_Z);
-buses[1].group.position.set(-150, 0, BUS_Z);
+const fleet = [busModern, busOld, busNXS, busNB, dblBus, elecBus];
+/* which body works which run.  The 871 brings its own; the NX2 is picked separately.
+   The 049 is the one run the old body still turns up on. */
+const ROUTE_BUS = { '032':busModern, '033':busNXS, '034':busNB,
+                    '049':busOld,    '449':elecBus, '871':elecBus };
+busModern.group.position.set(-95, 0, BUS_Z);
+busOld.group.position.set(-150, 0, BUS_Z);
+busNXS.group.position.set(-320, 0, BUS_Z);
+busNB.group.position.set(-375, 0, BUS_Z);
 dblBus.group.position.set(-210, 0, BUS_Z);
 elecBus.group.position.set(-265, 0, BUS_Z);
 fleet.forEach(b=>{ b.setDoor(0); b.clearFront(); });
@@ -8521,7 +9427,7 @@ const queueGuide = (function(){
 const G = {
   phase:'idle',        // idle | wait | arrive | board | depart | ride | gap | over
   t:0, total:0, round:0,
-  busIdx:0, bus:null, busX:-95, busV:0, targetBay:0, doorX:0,
+  bus:null, busX:-95, busV:0, targetBay:0, doorX:0,
   spaces:0, spacesMax:0, boarded:0, boardCD:0,
   playerBoarded:false, playerRank:0, shoved:0,
   doorT:0, boardTimer:0, gapT:0, rideT:0, started:false, doorNagCD:0,
@@ -8622,12 +9528,11 @@ function banner(txt, sub, ms){
 function startRound(){
   G.round++;
   G.phase='wait'; G.t=0;
-  G.busIdx = (G.round-1)%2;
   G.isDouble = (Math.random() < 0.2);           // one bus in five is the NX2 double-decker
   G.topDeck = false;
   G.route = G.isDouble ? null : pickSchoolRoute();
-  // the 871 brings its own bus; the school runs share the pair of yellow ones
-  G.bus = G.isDouble ? dblBus : (G.route.ev ? elecBus : buses[G.busIdx]);
+  // every route has a body of its own — see ROUTE_BUS
+  G.bus = G.isDouble ? dblBus : (ROUTE_BUS[G.route.n] || busModern);
   G.targetBay = BAYS[rint(0,2)];
   G.doorX = G.targetBay + DOOR_LX;
   // a normal bus takes 20, the NX2 takes 30.  The seats are unchanged — 10 of them on a
@@ -10274,7 +11179,8 @@ const LB = {
   key : 'sb_publishable_TcQ1mgz8_Shq5gi3VEKarA_FJh7F0ga',
   table : 'scores',      // where a run is written
   board : 'board',       // the view that keeps only each device's best run
-  top : 2000,        // the whole school, not a top-25 slice
+  top : 8000,        // the whole school, not a top-25 slice — walked in pages
+  total : null,      // how many runs the database actually holds
   busy : false, sent : false, rows : null, err : null
 };
 function lbOn(){ return !!(LB.url && LB.key); }
@@ -10427,12 +11333,31 @@ async function lbRead(qs, headers){
   }
   return r;
 }
+/* PostgREST will not hand back more than its max-rows in one request — 1000 on
+   a default Supabase project — so a board bigger than that has to be walked a
+   page at a time.  Asking for limit=2000 silently got us the first 1000 and
+   nothing else, which is why everybody below the cut vanished. */
+const LB_PAGE = 1000;
+async function lbFetchPage(from){
+  const r = await lbRead('?select=name,aura,grade&order=aura.desc'
+                       + '&offset=' + from + '&limit=' + LB_PAGE);
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return await r.json();
+}
 async function lbFetch(){
   if (!lbOn()) { LB.err = 'off'; return null; }
   try{
-    const r = await lbRead('?select=name,aura,grade&order=aura.desc&limit=' + LB.top);
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    LB.rows = lbSane(await r.json()); LB.err = null;
+    const raw = [];
+    for (let from = 0; from < LB.top; from += LB_PAGE){
+      const page = await lbFetchPage(from);
+      raw.push.apply(raw, page);
+      if (page.length < LB_PAGE) break;      // that was the last of them
+    }
+    LB.rows = lbSane(raw); LB.err = null;
+    /* The list is what survived the name and score filters; the count has to be
+       the real number of runs, or a board of 1200 reports itself as 824. */
+    LB.total = LB.rows.length;
+    try { LB.total = await lbCount(''); } catch(e){ /* header not exposed to us */ }
     // the standing record, captured before this run joins the board
     if (!G.recordSet){
       G.recordSet = true;
@@ -10605,7 +11530,7 @@ async function lbFinish(){
 }
 
 /* ---- what a real run can actually score ---- */
-const LB_AURA_MIN = -400, LB_AURA_MAX = 500;
+const LB_AURA_MIN = -400, LB_AURA_MAX = 320;   // 282 is the best a real run has managed
 /* Everything below treats the database as untrusted.  The grade is worked out
    from the score rather than read off the row, the name is put back through the
    same filter the entry box uses, and anything scoring outside what a real run
@@ -10651,8 +11576,9 @@ function lbRender(mine){
   if (!rows){ box.innerHTML = '<div class="lbNote">Loading…</div>'; return; }
   if (!rows.length){ box.innerHTML = '<div class="lbNote">Nobody on the board yet. Be first.</div>'; return; }
   const cnt = $('lbCount');
-  if (cnt) cnt.textContent = rows.length === 1 ? '1 run on the board'
-                                               : rows.length + ' runs on the board';
+  const tot = (typeof LB.total === 'number' && LB.total >= rows.length) ? LB.total : rows.length;
+  if (cnt) cnt.textContent = tot === 1 ? '1 run on the board'
+                                       : tot + ' runs on the board';
   let done = false;
   box.innerHTML = rows.map((r,i)=>{
     const me = (!done && mine && r.name === mine.name && r.aura === mine.aura) ? (done = true, ' me') : '';
@@ -11006,11 +11932,19 @@ if (__DEV) window.__BBB = { G, camera, buses, agents, scene, renderer, Audio_,
   detent(){ return {ejecting:+G.ejecting.toFixed(2), inDet:G.inDetention, t:+G.detention.toFixed(1),
                     barred:G.playerBarred, agents:agents.length, hasPlayer:agents.indexOf(player)>=0,
                     roomVisible:detention.group.visible, door:+detention.door.rotation.y.toFixed(2)}; },
+  // put a named route on stage with the body that actually works it
+  forceRoute(n){ G.isDouble=false; G.topDeck=false;
+             G.route = SCHOOL_ROUTES.find(r=>r.n===n) || SCHOOL_ROUTES[0];
+             G.bus = ROUTE_BUS[G.route.n] || busModern;
+             G.bus.setRoute(G.route); G.bus.clearFront(); G.spacesMax=G.spaces=BUS_CAP_SINGLE;
+             G.bus.releaseSeats(); G.bus.setBoarded(0); G.bus.group.position.set(G.busX,0,BUS_Z);
+             for (const b of fleet) if (b!==G.bus) b.group.position.set(-250,0,BUS_Z);
+             return G.bus; },
   forceEV(){ G.isDouble=false; G.route=SCHOOL_ROUTES[SCHOOL_ROUTES.length-1]; G.bus=elecBus;
              G.bus.setRoute(G.route); G.bus.clearFront(); G.spacesMax=G.spaces=BUS_CAP_SINGLE;
              G.bus.releaseSeats(); G.bus.setBoarded(0); G.bus.group.position.set(G.busX,0,BUS_Z);
              for (const b of fleet) if (b!==G.bus) b.group.position.set(-250,0,BUS_Z); },
-  detention, dblBus, elecBus, fleet, DET_Y, Ride, scene, THREE, Hall, HALL, HALL_Y,
+  detention, dblBus, elecBus, busNB, fleet, ROUTE_BUS, BUS_Z, DET_Y, Ride, scene, THREE, Hall, HALL, HALL_Y,
   hallBackZ, hallBackClear, hallLeafAngle, HALL_LEAF_X0, HALL_LEAF_X1, HALL_LEAF_W, HALL_LEAF_N,
   hallStep(dt){ G.total+=dt; updateHall(dt); },
   startHall(){ startAssembly(); },
