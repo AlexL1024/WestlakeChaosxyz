@@ -546,7 +546,7 @@
 </div>
 <div id="detOver" class="hidden">
   <div id="detCard">
-    <div class="detTag">GooseLake Boys' High School</div>
+    <div class="detTag">GooseLake High School</div>
     <div class="detTitle">DETENTION</div>
     <div class="detSub">Room 14 &middot; fill in the sheet before you go</div>
     <div class="detClock"><span id="detTimer">10</span><em>s</em></div>
@@ -576,7 +576,7 @@
 <div id="startOver" class="over hidden">
   <div class="card">
     <h1 id="gameTitle">Gooselake<em>.xyz</em></h1>
-    <div class="tag" style="margin:8px 0 0">GooseLake Boys' High School &middot; Monday, period one</div>
+    <div class="tag" style="margin:8px 0 0">GooseLake High School &middot; Monday, period one</div>
     <div id="bigKeys">
       <div class="bk"><b>W A S D</b><span>MOVE</span></div>
       <div class="bk"><b>SPACE</b><span>SHOVE</span></div>
@@ -3373,7 +3373,7 @@ function screenTexture(timeTxt){
   g.quadraticCurveTo(173,152,150,132); g.closePath(); g.fill();
   g.fillStyle='#fff'; g.beginPath(); g.ellipse(173,104,13,9,0,0,6.3); g.fill();
   g.fillStyle='#1c1c1c'; g.font='600 26px Georgia,serif'; g.textAlign='left';
-  g.fillText("GooseLake Boys' High School", 214, 96);
+  g.fillText("GooseLake High School", 214, 96);
   g.fillStyle='#4a4a4a'; g.font='15px Georgia,serif';
   g.fillText('Te Kura Tuarua o Nga Tamatane', 214, 122);
   g.fillStyle='#20242b'; g.font='600 40px "Segoe UI",sans-serif'; g.textAlign='right';
@@ -6775,7 +6775,7 @@ function drawExamPaper(cv, S){
      matters lives in the bottom two thirds, where you can actually read it. */
   if (S.stage === 'cover' || S.stage === 'reading'){
     g.font = '900 27px Georgia, serif'; g.fillStyle='#3a3a3a';
-    g.fillText('GOOSELAKE BOYS\u2019 HIGH SCHOOL', 46, 168);
+    g.fillText('GOOSELAKE \u2019 HIGH SCHOOL', 46, 168);
     g.font = '20px Georgia, serif'; g.fillStyle='#5a5a5a';
     g.fillText('Senior Practice Examination · Period 5', 46, 200);
     g.strokeStyle='#1b1b1b'; g.lineWidth=2;
@@ -9229,7 +9229,7 @@ function drawDetPaper(cv){
   g.fillStyle = '#e9e7dd'; g.fillRect(0,0,EXAM_CW,74);
   g.textAlign='left';
   g.font = '900 27px Georgia, serif'; g.fillStyle='#3a3a3a';
-  g.fillText('GOOSELAKE BOYS\u2019 HIGH SCHOOL', 46, 168);
+  g.fillText('GOOSELAKE\u2019 HIGH SCHOOL', 46, 168);
   g.font = '20px Georgia, serif'; g.fillStyle='#5a5a5a';
   g.fillText('Room 14 \u00b7 after school', 46, 200);
   g.strokeStyle='#1b1b1b'; g.lineWidth=2;
